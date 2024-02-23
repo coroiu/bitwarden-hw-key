@@ -4,7 +4,15 @@ Playground for experimenting with a Bitwarden Hardware Key.
 
 ## Platform
 
-This project is built on the popular ESP32 platform. The ESP32 is a low-cost, low-power microcontroller with integrated Wi-Fi and Bluetooth capabilities. It is a popular choice for IoT projects and is well supported by the Arduino IDE. But we are not using the Arduino IDE for this project. Instead, we are using `esp-rs` which based on ESP-IDF, the official development framework for the ESP32.
+This project is built on the popular ESP32 platform. The ESP32 is a low-cost, low-power microcontroller with integrated Wi-Fi and Bluetooth capabilities. It is a popular choice for IoT projects and is well supported by multiple framework. We are using `esp-rs` which based on ESP-IDF, the official development framework for the ESP32. EPS-IDF is written in C, but `esp-rs` provides a Rust wrapper around it. ESP-IDF is in turn based on FreeRTOS, a popular real-time operating system.
+
+## Hardware requirements
+
+This project is currently being developed on an Adafruit HUZZAH32 – ESP32 Feather Board connected to a 128x32 OLED FeatherWing. This board is a development board for the ESP32 microcontroller. It has a built-in USB-to-Serial converter, making it easy to program and debug. It also has a built-in LiPo battery charger, making it easy to power the board with a rechargeable battery.
+
+### Simulation
+
+This project does not currently support simulation/emulation.
 
 ## Getting started
 
