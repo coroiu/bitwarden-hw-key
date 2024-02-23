@@ -4,11 +4,11 @@ Playground for experimenting with a Bitwarden Hardware Key.
 
 ## Platform
 
-This project is built on the popular ESP32 platform. The ESP32 is a low-cost, low-power microcontroller with integrated Wi-Fi and Bluetooth capabilities. It is a popular choice for IoT projects and is well supported by multiple framework. We are using `esp-rs` which based on ESP-IDF, the official development framework for the ESP32. EPS-IDF is written in C, but `esp-rs` provides a Rust wrapper around it. ESP-IDF is in turn based on FreeRTOS, a popular real-time operating system.
+This project is built on the popular ESP32 platform. The ESP32 is a low-cost, low-power microcontroller with integrated Wi-Fi and Bluetooth capabilities. It is a popular choice for IoT projects and is well supported by multiple frameworks. We are using `esp-rs` which based on ESP-IDF, the official development framework for the ESP32. EPS-IDF is written in C, but `esp-rs` provides a Rust wrapper around it. ESP-IDF is in turn based on FreeRTOS, a popular real-time operating system.
 
 ## Hardware requirements
 
-This project is currently being developed on an Adafruit HUZZAH32 – ESP32 Feather Board connected to a 128x32 OLED FeatherWing. This board is a development board for the ESP32 microcontroller. It has a built-in USB-to-Serial converter, making it easy to program and debug. It also has a built-in LiPo battery charger, making it easy to power the board with a rechargeable battery.
+This project is currently being developed on an Adafruit HUZZAH32 – ESP32 Feather Board connected to a 128x32 SSD1306 OLED Feather Wing. The HUZZAH32 board is a development board for the ESP32 microcontroller. It has a built-in USB-to-Serial converter, making it easy to program and debug. It also has a built-in LiPo battery charger, making it easy to power the board with a rechargeable battery.
 
 ### Simulation
 
@@ -68,3 +68,11 @@ The C compiler
 ```
 
 Workaround: `CRATE_CC_NO_DEFAULTS=1 cargo run`
+
+**NOTE:** This will likely also cause issues with the `rust-anaylzer` VS Code extension. You can use the same workaround by editing your VS Code `settings.json` (open the file by searching for `Preferences: Open User Settings (JSON)`) and adding the following:
+
+```json
+"rust-analyzer.cargo.extraEnv": {
+  "CRATE_CC_NO_DEFAULTS": "1"
+}
+```
