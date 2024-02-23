@@ -1,10 +1,6 @@
-use embedded_graphics::{
-    geometry::Point,
-    mono_font::{ascii::FONT_10X20, MonoTextStyleBuilder},
-    pixelcolor::BinaryColor,
-    text::{Baseline, Text},
-    Drawable,
-};
+mod gui;
+
+use embedded_graphics::{geometry::Point, image::Image, Drawable};
 use esp_idf_svc::{
     hal::{
         delay::FreeRtos,
@@ -15,6 +11,8 @@ use esp_idf_svc::{
     sys::EspError,
 };
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
+
+use crate::gui::icons::BITWARDEN_LOGO;
 
 fn main() -> Result<(), EspError> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -59,17 +57,12 @@ fn main() -> Result<(), EspError> {
      *      BOOT       *
      *******************/
     // Splash screen
-    let text_style = MonoTextStyleBuilder::new()
-        .font(&FONT_10X20)
-        .text_color(BinaryColor::On)
-        .build();
-
-    Text::with_baseline("Bitwarden", Point::zero(), text_style, Baseline::Top)
+    Image::new(&BITWARDEN_LOGO.as_image_raw(), Point::new(0, 3))
         .draw(&mut display)
         .unwrap();
     display.flush().unwrap();
 
-    FreeRtos::delay_ms(2000);
+    FreeRtos::delay_ms(30000);
     display.clear_buffer();
     display.flush().unwrap();
 

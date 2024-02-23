@@ -1,6 +1,9 @@
+
 # POC: Bitwarden Hardware Key
 
 Playground for experimenting with a Bitwarden Hardware Key.
+
+![Prototype hardware](docs/prototype.jpg "Prototype hardware")
 
 ## Platform
 
