@@ -1,3 +1,5 @@
+use crate::gui::primitives::Color;
+
 #[derive(Default, Clone, Copy)]
 pub struct Styles {
     pub display: Display,
@@ -11,12 +13,4 @@ pub enum Display {
     Block,
     Inline,
     None,
-}
-
-#[derive(Default, Clone, Copy)]
-pub struct Color {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
 }

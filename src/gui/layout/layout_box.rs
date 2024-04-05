@@ -1,9 +1,9 @@
-use crate::gui::style::styled_node::StyledNode;
+use crate::gui::{primitives::Rectangle, style::styled_node::StyledNode};
 
 pub(crate) struct LayoutBox<'a> {
     dimensions: Dimensions,
-    pub(super) box_type: BoxType<'a>,
-    pub(super) children: Vec<LayoutBox<'a>>,
+    pub(crate) box_type: BoxType<'a>,
+    children: Vec<LayoutBox<'a>>,
 }
 
 #[derive(Clone, Copy)]
@@ -22,14 +22,6 @@ pub(crate) struct Dimensions {
 }
 
 #[derive(Default)]
-pub(crate) struct Rectangle {
-    x: i32,
-    y: i32,
-    width: u32,
-    height: u32,
-}
-
-#[derive(Default)]
 pub(crate) struct EdgeSizes {
     left: i32,
     right: i32,
@@ -45,6 +37,10 @@ impl<'a> LayoutBox<'a> {
             dimensions: Default::default(),
             children: Vec::new(),
         }
+    }
+
+    pub fn children(&self) -> &Vec<LayoutBox> {
+        &self.children
     }
 
     pub(crate) fn add_child(&mut self, child: LayoutBox<'a>) {
