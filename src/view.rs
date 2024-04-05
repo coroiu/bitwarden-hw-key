@@ -3,7 +3,7 @@ use crate::gui::{
         node::{Attributes, Node, NodeType, TextNodeData},
         Document,
     },
-    layout::styles::{Display, Styles},
+    style::styles::{Display, Styles},
 };
 
 pub fn create_view() -> Document {

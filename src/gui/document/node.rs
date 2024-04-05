@@ -1,4 +1,4 @@
-use crate::gui::layout::styles::Styles;
+use crate::gui::style::styles::Styles;
 
 pub struct Node {
     pub children: Vec<Node>,
