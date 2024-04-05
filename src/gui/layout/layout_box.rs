@@ -1,6 +1,9 @@
 use crate::gui::{
-    primitives::Rectangle,
-    style::{styled_node::StyledNode, styles::Size},
+    primitives::{Edges, Rectangle},
+    style::{
+        styled_node::StyledNode,
+        styles::{Size, Styles},
+    },
 };
 
 pub(crate) struct LayoutBox<'a> {
@@ -19,17 +22,26 @@ pub(crate) enum BoxType<'a> {
 #[derive(Default)]
 pub(crate) struct Dimensions {
     content: Rectangle,
-    padding: EdgeSizes,
-    border: EdgeSizes,
-    margin: EdgeSizes,
+    padding: Edges,
+    border: Edges,
+    margin: Edges,
 }
 
-#[derive(Default)]
-pub(crate) struct EdgeSizes {
-    left: i32,
-    right: i32,
-    top: i32,
-    bottom: i32,
+impl Dimensions {
+    // The area covered by the content area plus its padding.
+    fn padding_box(&self) -> Rectangle {
+        self.content.expand(&self.padding)
+    }
+
+    // The area covered by the content area plus padding and borders.
+    fn border_box(&self) -> Rectangle {
+        self.padding_box().expand(&self.border)
+    }
+
+    // The area covered by the content area plus padding, borders, and margin.
+    fn margin_box(&self) -> Rectangle {
+        self.border_box().expand(&self.margin)
+    }
 }
 
 impl<'a> LayoutBox<'a> {
@@ -71,7 +83,7 @@ impl<'a> LayoutBox<'a> {
         }
     }
 
-    pub(crate) fn layout(&mut self, containing_block: Dimensions) {
+    pub(crate) fn layout(&mut self, containing_block: &Dimensions) {
         match self.box_type {
             BoxType::BlockNode(_) => self.layout_block(containing_block),
             BoxType::InlineNode(_) => {}
@@ -79,17 +91,18 @@ impl<'a> LayoutBox<'a> {
         }
     }
 
-    fn layout_block(&mut self, containing_block: Dimensions) {
+    fn layout_block(&mut self, containing_block: &Dimensions) {
         self.calculate_block_width(containing_block);
-        // self.calculate_block_position(containing_block);
+        self.calculate_vertical_edges(containing_block);
+        self.calculate_block_position(containing_block);
         // self.layout_block_children();
         // self.calculate_block_height();
     }
 
-    fn calculate_block_width(&mut self, containing_block: Dimensions) {
+    fn calculate_block_width(&mut self, containing_block: &Dimensions) {
         let style = match self.box_type {
             BoxType::BlockNode(style_node) => &style_node.style,
-            _ => panic!("calculate_block_width called on non-block"),
+            _ => panic!("cannot extract styles from called on non-block"),
         };
 
         // We don't expect the content width to be so big that we overflow an i32
@@ -171,5 +184,89 @@ impl<'a> LayoutBox<'a> {
                 margin_right = Size::Pixels(margin_right.to_pixels(containing_width) + underflow);
             }
         }
+    }
+
+    fn calculate_vertical_edges(&mut self, containing_block: &Dimensions) {
+        let style = match self.box_type {
+            BoxType::BlockNode(style_node) => &style_node.style,
+            _ => panic!("cannot extract styles from called on non-block"),
+        };
+
+        let containing_width = containing_block.content.width.try_into().unwrap();
+        let d = &mut self.dimensions;
+
+        d.margin.top = style
+            .margin
+            .and_then(|m| m.top)
+            .map(|v| v.to_pixels(containing_width))
+            .unwrap_or(0);
+        d.margin.bottom = style
+            .margin
+            .and_then(|m| m.bottom)
+            .map(|v| v.to_pixels(containing_width))
+            .unwrap_or(0);
+
+        d.border.top = style
+            .border
+            .and_then(|m| m.top)
+            .map(|v| v.to_pixels(containing_width))
+            .unwrap_or(0);
+        d.border.bottom = style
+            .border
+            .and_then(|m| m.bottom)
+            .map(|v| v.to_pixels(containing_width))
+            .unwrap_or(0);
+
+        d.padding.top = style
+            .padding
+            .and_then(|m| m.top)
+            .map(|v| v.to_pixels(containing_width))
+            .unwrap_or(0);
+        d.padding.bottom = style
+            .padding
+            .and_then(|m| m.bottom)
+            .map(|v| v.to_pixels(containing_width))
+            .unwrap_or(0);
+    }
+
+    fn calculate_block_position(&mut self, containing_block: &Dimensions) {
+        let style = match self.box_type {
+            BoxType::BlockNode(style_node) => &style_node.style,
+            _ => panic!("cannot extract styles from called on non-block"),
+        };
+
+        let d = &mut self.dimensions;
+        d.content.x = containing_block.content.x + d.margin.left + d.border.left + d.padding.left;
+
+        // Position the box below all the previous boxes in the container.
+        d.content.y = containing_block.content.height as i32
+            + containing_block.content.y
+            + d.margin.top
+            + d.border.top
+            + d.padding.top;
+    }
+
+    fn layout_block_children(&mut self) {
+        let d = &mut self.dimensions;
+        for child in &mut self.children {
+            child.layout(d);
+            // Track the height so each child is laid out below the previous content.
+            d.content.height = d.content.height + child.dimensions.margin_box().height;
+        }
+    }
+
+    fn calculate_block_height(&mut self, containing_block: &Dimensions) {
+        // If the height is set to an explicit length, use that exact length.
+        // Otherwise, just keep the value set by `layout_block_children`.
+        let style = match self.box_type {
+            BoxType::BlockNode(style_node) => &style_node.style,
+            _ => panic!("cannot extract styles from called on non-block"),
+        };
+        let containing_width = containing_block.content.width.try_into().unwrap();
+
+        self.dimensions.content.height = style
+            .height
+            .map(|h| h.to_pixels(containing_width))
+            .unwrap_or(0) as u32;
     }
 }

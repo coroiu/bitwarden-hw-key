@@ -13,3 +13,22 @@ pub struct Rectangle {
     pub width: u32,
     pub height: u32,
 }
+
+#[derive(Default, Clone, Copy)]
+pub struct Edges {
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+    pub left: i32,
+}
+
+impl Rectangle {
+    pub fn expand(&self, edges: &Edges) -> Rectangle {
+        Rectangle {
+            x: self.x - edges.left,
+            y: self.y - edges.top,
+            width: self.width + (edges.left + edges.right) as u32,
+            height: self.height + (edges.top + edges.bottom) as u32,
+        }
+    }
+}

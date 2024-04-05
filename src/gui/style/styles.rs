@@ -46,8 +46,8 @@ impl Size {
 
 #[derive(Default, Clone, Copy)]
 pub struct EdgeSizes {
-    pub left: Option<Size>,
-    pub right: Option<Size>,
     pub top: Option<Size>,
+    pub right: Option<Size>,
+    pub left: Option<Size>,
     pub bottom: Option<Size>,
 }
