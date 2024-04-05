@@ -9,6 +9,8 @@ pub fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>) -> LayoutBox<'a> {
         Display::None => panic!("Root node has display: none."),
     });
 
+    // TODO: Maybe we should just send this straight into the constructor above, instead of
+    // manually pushing evey item into the vector. See `fn style_tree()`.
     for child in &style_node.children {
         let child_layout_box = build_layout_tree(child);
         root.add_child(child_layout_box);
