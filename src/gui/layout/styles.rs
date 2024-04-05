@@ -1,8 +1,8 @@
 #[derive(Default, Clone, Copy)]
 pub struct Styles {
-    display: Option<Display>,
-    color: Option<Color>,
-    background_color: Option<Color>,
+    pub display: Option<Display>,
+    pub color: Option<Color>,
+    pub background_color: Option<Color>,
 }
 
 #[derive(Default, Clone, Copy)]

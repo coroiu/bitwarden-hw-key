@@ -1,4 +1,5 @@
 mod gui;
+mod view;
 
 use embedded_graphics::{geometry::Point, image::Image, Drawable};
 use esp_idf_svc::{
@@ -12,7 +13,7 @@ use esp_idf_svc::{
 };
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
-use crate::gui::icons::BITWARDEN_LOGO;
+use crate::{gui::icons::BITWARDEN_LOGO, view::create_view};
 
 fn main() -> Result<(), EspError> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -70,6 +71,13 @@ fn main() -> Result<(), EspError> {
      *    MAIN LOOP    *
      *******************/
     led.set_low()?; // Indicate program main loop phase
+
+    /*******************
+     *   SETUP VIEWS   *
+     *******************/
+
+    let view = create_view();
+
     loop {
         // Sleeping here to make sure the watchdog isn't triggered
         FreeRtos::delay_ms(500);

@@ -8,6 +8,7 @@ pub struct Node {
 
 // Attributes might not be needed, might also be mergeable with GenericNodeData
 // type Attributes = HashMap<String, String>;
+#[derive(Default)]
 pub struct Attributes {
     pub id: Option<String>,
     pub style: Option<Styles>,
@@ -23,5 +24,15 @@ pub enum NodeType {
 }
 
 pub struct TextNodeData {
-    text: String,
+    pub text: String,
+}
+
+impl Node {
+    pub fn new(node_type: NodeType, attributes: Attributes) -> Self {
+        Node {
+            children: Vec::new(),
+            node_data: GenericNodeData { attributes },
+            node_type,
+        }
+    }
 }
