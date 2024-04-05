@@ -15,7 +15,7 @@ pub fn create_view() -> Document {
         }),
         Attributes {
             style: Some(Styles {
-                display: Some(Display::Inline),
+                display: Display::Inline,
                 ..Default::default()
             }),
             ..Default::default()
@@ -28,7 +28,7 @@ pub fn create_view() -> Document {
         }),
         Attributes {
             style: Some(Styles {
-                display: Some(Display::Inline),
+                display: Display::Inline,
                 ..Default::default()
             }),
             ..Default::default()

@@ -1,6 +1,6 @@
 #[derive(Default, Clone, Copy)]
 pub struct Styles {
-    pub display: Option<Display>,
+    pub display: Display,
     pub color: Option<Color>,
     pub background_color: Option<Color>,
 }
