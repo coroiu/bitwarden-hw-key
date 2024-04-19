@@ -141,8 +141,8 @@ impl<'a> LayoutBox<'a> {
     }
 
     fn layout_flex(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {
-        self.calculate_flex_width(styled_node, containing_block);
         self.calculate_flex_height(styled_node, containing_block);
+        self.calculate_flex_width(styled_node, containing_block);
         // self.layout_flex_children(styled_node, containing_block);
 
         log::info!("Flex layout: {:?}", self.dimensions);
@@ -239,7 +239,7 @@ impl<'a> LayoutBox<'a> {
         .sum();
 
         let underflow = containing_height - total;
-
+        log::info!("Underflow: {}", underflow);
         // if height is auto and there is space left in the container, fill it
         match height {
             Size::Auto if underflow >= 0 => {
@@ -248,10 +248,12 @@ impl<'a> LayoutBox<'a> {
             _ => {}
         }
 
+        log::info!("Height: {:?}", height);
+
         // TODO: Adjust margin_top and margin_bottom based on justification, underflow, etc.
 
         let d = &mut self.dimensions;
-        d.content.height = height.to_pixels(containing_height).try_into().unwrap();
+        d.content.height = height.to_pixels(containing_height) as u32;
 
         d.padding.top = padding_top.to_pixels(containing_height);
         d.padding.bottom = padding_bottom.to_pixels(containing_height);

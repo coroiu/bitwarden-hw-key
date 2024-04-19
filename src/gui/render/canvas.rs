@@ -30,8 +30,6 @@ impl Canvas {
     fn paint_command(&mut self, command: &RenderCommand) {
         match command {
             &RenderCommand::SolidColor(color, rect) => {
-                log::info!("Painting {:?} at {:?}", color, rect);
-
                 // Clip the rectangle to the canvas boundaries.
                 let x0 = rect.x.clamp(0, self.width as i32) as usize;
                 let y0 = rect.y.clamp(0, self.height as i32) as usize;

@@ -19,8 +19,8 @@ pub fn create_view(width: u32, height: u32) -> Document {
             style: Some(Styles {
                 display: Display::Flex,
                 background_color: Color::white().into(),
-                width: Some(Size::Pixels(30)),
-                height: Some(Size::Pixels(20)),
+                width: Size::Pixels(30).into(),
+                height: Size::Auto.into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -49,7 +49,7 @@ pub fn create_view(width: u32, height: u32) -> Document {
                 background_color: Color::white().into(),
                 border_color: Color::white().into(),
                 width: Size::Pixels(30).into(),
-                height: Size::Pixels(20).into(),
+                height: Size::Auto.into(),
                 border: EdgeSizes::all(Size::Pixels(1)).into(),
                 padding: EdgeSizes::all(Size::Pixels(1)).into(),
                 margin: EdgeSizes::all(Size::Pixels(1)).into(),
