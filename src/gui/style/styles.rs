@@ -10,6 +10,7 @@ pub struct Styles {
     pub margin: Option<EdgeSizes>,
     pub padding: Option<EdgeSizes>,
     pub border: Option<EdgeSizes>,
+    pub flex_direction: Option<FlexDirection>,
 }
 
 #[derive(Default, Clone, Copy)]
@@ -45,10 +46,52 @@ impl Size {
     }
 }
 
+impl From<i32> for Size {
+    fn from(px: i32) -> Self {
+        Size::Pixels(px)
+    }
+}
+
 #[derive(Default, Clone, Copy)]
 pub struct EdgeSizes {
     pub top: Option<Size>,
     pub right: Option<Size>,
-    pub left: Option<Size>,
     pub bottom: Option<Size>,
+    pub left: Option<Size>,
+}
+
+impl EdgeSizes {
+    pub fn zero() -> EdgeSizes {
+        EdgeSizes {
+            top: Some(Size::zero()),
+            right: Some(Size::zero()),
+            bottom: Some(Size::zero()),
+            left: Some(Size::zero()),
+        }
+    }
+
+    pub fn all(size: Size) -> EdgeSizes {
+        EdgeSizes {
+            top: Some(size),
+            right: Some(size),
+            bottom: Some(size),
+            left: Some(size),
+        }
+    }
+
+    pub fn axis(vertical: Size, horizontal: Size) -> EdgeSizes {
+        EdgeSizes {
+            top: Some(vertical),
+            right: Some(horizontal),
+            bottom: Some(vertical),
+            left: Some(horizontal),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub enum FlexDirection {
+    #[default]
+    Row,
+    Column,
 }

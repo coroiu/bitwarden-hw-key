@@ -6,6 +6,20 @@ pub struct Color {
     pub a: u8,
 }
 
+impl Color {
+    pub fn rgb(r: u8, g: u8, b: u8) -> Color {
+        Color { r, g, b, a: 255 }
+    }
+
+    pub fn black() -> Color {
+        Color::rgb(0, 0, 0)
+    }
+
+    pub fn white() -> Color {
+        Color::rgb(255, 255, 255)
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Rectangle {
     pub x: i32,

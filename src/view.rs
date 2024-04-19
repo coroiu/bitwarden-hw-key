@@ -7,7 +7,7 @@ use crate::gui::{
     },
     primitives::Color,
     render::Canvas,
-    style::styles::{Display, Size, Styles},
+    style::styles::{Display, EdgeSizes, Size, Styles},
 };
 
 pub fn create_view(width: u32, height: u32) -> Document {
@@ -18,14 +18,43 @@ pub fn create_view(width: u32, height: u32) -> Document {
         Attributes {
             style: Some(Styles {
                 display: Display::Flex,
-                background_color: Some(Color {
-                    r: 255,
-                    g: 255,
-                    b: 255,
-                    a: 255,
-                }),
-                width: Some(Size::Pixels(80)),
-                height: Some(Size::Pixels(15)),
+                background_color: Color::white().into(),
+                width: Some(Size::Pixels(30)),
+                height: Some(Size::Pixels(20)),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    ));
+
+    document.children_mut().push(Node::new(
+        NodeType::Box(),
+        Attributes {
+            style: Some(Styles {
+                display: Display::Flex,
+                background_color: Color::black().into(),
+                width: Size::Pixels(30).into(),
+                height: Size::Pixels(20).into(),
+                border: EdgeSizes::all(Size::Pixels(1)).into(),
+                padding: EdgeSizes::all(Size::Pixels(1)).into(),
+                margin: EdgeSizes::all(Size::Pixels(1)).into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    ));
+
+    document.children_mut().push(Node::new(
+        NodeType::Box(),
+        Attributes {
+            style: Some(Styles {
+                display: Display::Flex,
+                background_color: Color::white().into(),
+                width: Size::Pixels(30).into(),
+                height: Size::Pixels(20).into(),
+                border: EdgeSizes::all(Size::Pixels(1)).into(),
+                padding: EdgeSizes::all(Size::Pixels(1)).into(),
+                margin: EdgeSizes::all(Size::Pixels(1)).into(),
                 ..Default::default()
             }),
             ..Default::default()
