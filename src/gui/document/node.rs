@@ -4,7 +4,14 @@ pub struct Node {
     pub children: Vec<Node>,
     pub node_data: GenericNodeData,
     pub node_type: NodeType,
+    // Sort of like an angular component, needs some method of refering to the node
+    // pub custom_component: Option<Box<dyn CustomComponent>>,
 }
+
+// pub trait CustomComponent {
+//     // reference needs to be able to stored, maybe use ARC or something
+//     on_init(&self, node: &mut Node);
+// }
 
 // Attributes might not be needed, might also be mergeable with GenericNodeData
 // type Attributes = HashMap<String, String>;
