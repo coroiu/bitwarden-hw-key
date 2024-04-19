@@ -95,8 +95,8 @@ impl<'a> LayoutBox<'a> {
         self.calculate_block_width(containing_block);
         self.calculate_vertical_edges(containing_block);
         self.calculate_block_position(containing_block);
-        // self.layout_block_children();
-        // self.calculate_block_height();
+        self.layout_block_children();
+        self.calculate_block_height(containing_block);
     }
 
     fn calculate_block_width(&mut self, containing_block: &Dimensions) {
@@ -184,6 +184,21 @@ impl<'a> LayoutBox<'a> {
                 margin_right = Size::Pixels(margin_right.to_pixels(containing_width) + underflow);
             }
         }
+
+        let d = &mut self.dimensions;
+        d.content.width = width
+            .to_pixels(containing_width)
+            .try_into()
+            .unwrap_or_default();
+
+        d.padding.left = padding_left.to_pixels(containing_width);
+        d.padding.right = padding_right.to_pixels(containing_width);
+
+        d.border.left = border_left.to_pixels(containing_width);
+        d.border.right = border_right.to_pixels(containing_width);
+
+        d.margin.left = margin_left.to_pixels(containing_width);
+        d.margin.right = margin_right.to_pixels(containing_width);
     }
 
     fn calculate_vertical_edges(&mut self, containing_block: &Dimensions) {
