@@ -4,7 +4,6 @@ use super::layout_box::{BoxType, LayoutBox};
 
 pub fn build_layout_tree<'a>(style_root: &'a StyledNode<'a>) -> LayoutBox<'a> {
     let mut root = LayoutBox::new(match style_root.style.display {
-        Display::Block => BoxType::BlockNode(style_root),
         Display::Flex => BoxType::FlexNode(style_root),
         Display::Inline => BoxType::InlineNode(style_root),
         Display::None => panic!("Root node has display: none."),

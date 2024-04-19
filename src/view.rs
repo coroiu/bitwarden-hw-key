@@ -2,7 +2,7 @@ use embedded_graphics::{pixelcolor::BinaryColor, Drawable};
 
 use crate::gui::{
     document::{
-        node::{Attributes, Node, NodeType, TextNodeData},
+        node::{Attributes, Node, NodeType},
         Document,
     },
     primitives::Color,

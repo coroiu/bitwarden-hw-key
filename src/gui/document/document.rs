@@ -1,6 +1,6 @@
 use crate::gui::{
     layout::layout_tree::build_layout_tree,
-    primitives::Rectangle,
+    primitives::{Color, Rectangle},
     render::{paint, Canvas},
     style::{
         style_tree::build_style_tree,
@@ -26,12 +26,7 @@ impl Document {
                         display: Display::Flex,
                         width: Some(Size::Pixels(width as i32)),
                         height: Some(Size::Pixels(height as i32)),
-                        background_color: Some(crate::gui::primitives::Color {
-                            r: 10,
-                            g: 10,
-                            b: 10,
-                            a: 10,
-                        }),
+                        background_color: Color::black().into(),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -42,6 +37,7 @@ impl Document {
         }
     }
 
+    #[allow(dead_code)]
     pub fn children(&self) -> &Vec<Node> {
         &self.root.children
     }

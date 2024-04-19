@@ -2,7 +2,6 @@ use crate::gui::{
     document::node::NodeType,
     layout::layout_box::{BoxType, LayoutBox},
     primitives::{Color, Rectangle},
-    style::styled_node,
 };
 
 pub enum RenderCommand {
@@ -27,9 +26,7 @@ fn render_layout_box(list: &mut Vec<RenderCommand>, layout_box: &LayoutBox) {
 fn render_generic_traits(list: &mut Vec<RenderCommand>, layout_box: &LayoutBox) {
     match layout_box.box_type {
         BoxType::AnonymousBlock => {} // Anonymous boxes are not rendered
-        BoxType::BlockNode(styled_node)
-        | BoxType::InlineNode(styled_node)
-        | BoxType::FlexNode(styled_node) => {
+        BoxType::InlineNode(styled_node) | BoxType::FlexNode(styled_node) => {
             // # Content box
             list.push(RenderCommand::SolidColor(
                 styled_node.style.background_color.unwrap_or_default(),
@@ -97,9 +94,7 @@ fn render_generic_traits(list: &mut Vec<RenderCommand>, layout_box: &LayoutBox) 
 fn render_specific_traits(_list: &mut Vec<RenderCommand>, layout_box: &LayoutBox) {
     match layout_box.box_type {
         BoxType::AnonymousBlock => {} // Anonymous boxes are not rendered
-        BoxType::BlockNode(styled_node)
-        | BoxType::InlineNode(styled_node)
-        | BoxType::FlexNode(styled_node) => {
+        BoxType::InlineNode(styled_node) | BoxType::FlexNode(styled_node) => {
             match &styled_node.node.node_type {
                 NodeType::Box() => {} // Box doesn't have any specific rendering traits
                 NodeType::Text(_text_node_data) => {

@@ -17,7 +17,6 @@ pub struct Styles {
 #[derive(Default, Clone, Copy)]
 pub enum Display {
     #[default]
-    Block,
     Flex,
     Inline,
     None,
