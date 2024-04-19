@@ -6,7 +6,7 @@ pub struct Color {
     pub a: u8,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct Rectangle {
     pub x: i32,
     pub y: i32,
@@ -23,6 +23,15 @@ pub struct Edges {
 }
 
 impl Rectangle {
+    pub fn new(x: i32, y: i32, width: u32, height: u32) -> Rectangle {
+        Rectangle {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
     pub fn expand(&self, edges: &Edges) -> Rectangle {
         Rectangle {
             x: self.x - edges.left,

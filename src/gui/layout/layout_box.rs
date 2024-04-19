@@ -1,13 +1,10 @@
 use crate::gui::{
     primitives::{Edges, Rectangle},
-    style::{
-        styled_node::StyledNode,
-        styles::{Size, Styles},
-    },
+    style::{styled_node::StyledNode, styles::Size},
 };
 
 pub(crate) struct LayoutBox<'a> {
-    dimensions: Dimensions,
+    pub(crate) dimensions: Dimensions,
     pub(crate) box_type: BoxType<'a>,
     children: Vec<LayoutBox<'a>>,
 }
@@ -21,10 +18,10 @@ pub(crate) enum BoxType<'a> {
 
 #[derive(Default)]
 pub(crate) struct Dimensions {
-    content: Rectangle,
-    padding: Edges,
-    border: Edges,
-    margin: Edges,
+    pub(crate) content: Rectangle,
+    pub(crate) padding: Edges,
+    pub(crate) border: Edges,
+    pub(crate) margin: Edges,
 }
 
 impl Dimensions {
@@ -83,7 +80,18 @@ impl<'a> LayoutBox<'a> {
         }
     }
 
-    pub(crate) fn layout(&mut self, containing_block: &Dimensions) {
+    pub(crate) fn layout(&mut self, bounds: Rectangle) {
+        let containing_block = Dimensions {
+            content: bounds,
+            padding: Default::default(),
+            border: Default::default(),
+            margin: Default::default(),
+        };
+
+        self.layout_as_child(&containing_block);
+    }
+
+    fn layout_as_child(&mut self, containing_block: &Dimensions) {
         match self.box_type {
             BoxType::BlockNode(_) => self.layout_block(containing_block),
             BoxType::InlineNode(_) => {}
@@ -245,10 +253,10 @@ impl<'a> LayoutBox<'a> {
     }
 
     fn calculate_block_position(&mut self, containing_block: &Dimensions) {
-        let style = match self.box_type {
-            BoxType::BlockNode(style_node) => &style_node.style,
-            _ => panic!("cannot extract styles from called on non-block"),
-        };
+        // let style = match self.box_type {
+        //     BoxType::BlockNode(style_node) => &style_node.style,
+        //     _ => panic!("cannot extract styles from called on non-block"),
+        // };
 
         let d = &mut self.dimensions;
         d.content.x = containing_block.content.x + d.margin.left + d.border.left + d.padding.left;
@@ -264,7 +272,7 @@ impl<'a> LayoutBox<'a> {
     fn layout_block_children(&mut self) {
         let d = &mut self.dimensions;
         for child in &mut self.children {
-            child.layout(d);
+            child.layout_as_child(d);
             // Track the height so each child is laid out below the previous content.
             d.content.height = d.content.height + child.dimensions.margin_box().height;
         }

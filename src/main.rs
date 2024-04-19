@@ -63,7 +63,7 @@ fn main() -> Result<(), EspError> {
         .unwrap();
     display.flush().unwrap();
 
-    FreeRtos::delay_ms(30000);
+    FreeRtos::delay_ms(1000);
     display.clear_buffer();
     display.flush().unwrap();
 
@@ -76,7 +76,18 @@ fn main() -> Result<(), EspError> {
      *   SETUP VIEWS   *
      *******************/
 
-    let view = create_view();
+    let view = create_view(128, 32);
+    let canvas = view.draw();
+    canvas.draw(&mut display).unwrap();
+    display.flush().unwrap();
+
+    log::info!("Test draw finished");
+
+    FreeRtos::delay_ms(30000);
+
+    log::info!("Clearing display");
+    display.clear_buffer();
+    display.flush().unwrap();
 
     loop {
         // Sleeping here to make sure the watchdog isn't triggered
