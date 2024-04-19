@@ -30,17 +30,17 @@ pub(crate) struct Dimensions {
 
 impl Dimensions {
     // The area covered by the content area plus its padding.
-    fn padding_box(&self) -> Rectangle {
+    pub(crate) fn padding_box(&self) -> Rectangle {
         self.content.expand(&self.padding)
     }
 
     // The area covered by the content area plus padding and borders.
-    fn border_box(&self) -> Rectangle {
+    pub(crate) fn border_box(&self) -> Rectangle {
         self.padding_box().expand(&self.border)
     }
 
     // The area covered by the content area plus padding, borders, and margin.
-    fn margin_box(&self) -> Rectangle {
+    pub(crate) fn margin_box(&self) -> Rectangle {
         self.border_box().expand(&self.margin)
     }
 }
@@ -155,6 +155,7 @@ impl<'a> LayoutBox<'a> {
 
                 // // We don't expect the content width to be so big that we overflow an i32
                 let containing_width = containing_block.content.width.try_into().unwrap();
+                let d = &mut self.dimensions;
 
                 // margins, borders, and paddings default to 0
                 let margin_left = style.margin.and_then(|m| m.left).unwrap_or(Size::zero());
@@ -166,9 +167,14 @@ impl<'a> LayoutBox<'a> {
                 let padding_left = style.padding.and_then(|p| p.left).unwrap_or(Size::zero());
                 let padding_right = style.padding.and_then(|p| p.right).unwrap_or(Size::zero());
 
-                let d = &mut self.dimensions;
-                d.content.y =
-                    containing_block.content.y + d.margin.top + d.border.top + d.padding.top;
+                d.padding.left = padding_left.to_pixels(containing_width);
+                d.padding.right = padding_right.to_pixels(containing_width);
+
+                d.border.left = border_left.to_pixels(containing_width);
+                d.border.right = border_right.to_pixels(containing_width);
+
+                d.margin.left = margin_left.to_pixels(containing_width);
+                d.margin.right = margin_right.to_pixels(containing_width);
 
                 // Position the box to the left of all the previous boxes in the container.
                 d.content.x = containing_block.content.width as i32
@@ -183,16 +189,7 @@ impl<'a> LayoutBox<'a> {
                     d.content.width = d.content.width + child.dimensions.margin_box().width;
                 }
 
-                d.padding.left = padding_left.to_pixels(containing_width);
-                d.padding.right = padding_right.to_pixels(containing_width);
-
-                d.border.left = border_left.to_pixels(containing_width);
-                d.border.right = border_right.to_pixels(containing_width);
-
-                d.margin.left = margin_left.to_pixels(containing_width);
-                d.margin.right = margin_right.to_pixels(containing_width);
-
-                // width defaults to auto
+                // resize width if it was set explicitly
                 let width = style.width.unwrap_or_default();
                 match width {
                     Size::Pixels(_) | Size::Percentage(_) => {
@@ -264,6 +261,8 @@ impl<'a> LayoutBox<'a> {
 
         d.margin.top = margin_top.to_pixels(containing_height);
         d.margin.bottom = margin_bottom.to_pixels(containing_height);
+
+        d.content.y = containing_block.content.y + d.margin.top + d.border.top + d.padding.top;
     }
 
     fn layout_flex_children(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {

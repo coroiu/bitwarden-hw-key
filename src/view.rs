@@ -27,22 +27,19 @@ pub fn create_view(width: u32, height: u32) -> Document {
         },
     ));
 
-    document.children_mut().push(Node::new(
-        NodeType::Box(),
-        Attributes {
-            style: Some(Styles {
-                display: Display::Flex,
-                background_color: Color::black().into(),
-                width: Size::Pixels(30).into(),
-                height: Size::Pixels(20).into(),
-                border: EdgeSizes::all(Size::Pixels(1)).into(),
-                padding: EdgeSizes::all(Size::Pixels(1)).into(),
-                margin: EdgeSizes::all(Size::Pixels(1)).into(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    ));
+    // document.children_mut().push(Node::new(
+    //     NodeType::Box(),
+    //     Attributes {
+    //         style: Some(Styles {
+    //             display: Display::Flex,
+    //             background_color: Color::black().into(),
+    //             width: Size::Pixels(30).into(),
+    //             height: Size::Pixels(20).into(),
+    //             ..Default::default()
+    //         }),
+    //         ..Default::default()
+    //     },
+    // ));
 
     document.children_mut().push(Node::new(
         NodeType::Box(),
@@ -50,6 +47,7 @@ pub fn create_view(width: u32, height: u32) -> Document {
             style: Some(Styles {
                 display: Display::Flex,
                 background_color: Color::white().into(),
+                border_color: Color::white().into(),
                 width: Size::Pixels(30).into(),
                 height: Size::Pixels(20).into(),
                 border: EdgeSizes::all(Size::Pixels(1)).into(),

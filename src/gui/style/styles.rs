@@ -5,6 +5,7 @@ pub struct Styles {
     pub display: Display,
     pub color: Option<Color>,
     pub background_color: Option<Color>,
+    pub border_color: Option<Color>,
     pub width: Option<Size>,
     pub height: Option<Size>,
     pub margin: Option<EdgeSizes>,

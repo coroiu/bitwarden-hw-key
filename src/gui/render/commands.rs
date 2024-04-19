@@ -30,6 +30,7 @@ fn render_generic_traits(list: &mut Vec<RenderCommand>, layout_box: &LayoutBox) 
         BoxType::BlockNode(styled_node)
         | BoxType::InlineNode(styled_node)
         | BoxType::FlexNode(styled_node) => {
+            // # Content box
             list.push(RenderCommand::SolidColor(
                 styled_node.style.background_color.unwrap_or_default(),
                 Rectangle {
@@ -39,12 +40,61 @@ fn render_generic_traits(list: &mut Vec<RenderCommand>, layout_box: &LayoutBox) 
                     height: layout_box.dimensions.content.height,
                 },
             ));
+
+            // # Border
+            let border_box = layout_box.dimensions.border_box();
+
+            // ## Top border
+            list.push(RenderCommand::SolidColor(
+                styled_node.style.border_color.unwrap_or_default(),
+                Rectangle {
+                    x: border_box.x,
+                    y: border_box.y,
+                    width: border_box.width,
+                    height: layout_box.dimensions.border.top as u32,
+                },
+            ));
+
+            // ## Right border
+            list.push(RenderCommand::SolidColor(
+                styled_node.style.border_color.unwrap_or_default(),
+                Rectangle {
+                    x: border_box.x + border_box.width as i32
+                        - layout_box.dimensions.border.right as i32,
+                    y: border_box.y,
+                    width: layout_box.dimensions.border.right as u32,
+                    height: border_box.height,
+                },
+            ));
+
+            // ## Bottom border
+            list.push(RenderCommand::SolidColor(
+                styled_node.style.border_color.unwrap_or_default(),
+                Rectangle {
+                    x: border_box.x,
+                    y: border_box.y + border_box.height as i32
+                        - layout_box.dimensions.border.bottom as i32,
+                    width: border_box.width,
+                    height: layout_box.dimensions.border.bottom as u32,
+                },
+            ));
+
+            // ## Left border
+            list.push(RenderCommand::SolidColor(
+                styled_node.style.border_color.unwrap_or_default(),
+                Rectangle {
+                    x: border_box.x,
+                    y: border_box.y,
+                    width: layout_box.dimensions.border.left as u32,
+                    height: border_box.height,
+                },
+            ));
         }
     }
     render_specific_traits(list, layout_box);
 }
 
-fn render_specific_traits(list: &mut Vec<RenderCommand>, layout_box: &LayoutBox) {
+fn render_specific_traits(_list: &mut Vec<RenderCommand>, layout_box: &LayoutBox) {
     match layout_box.box_type {
         BoxType::AnonymousBlock => {} // Anonymous boxes are not rendered
         BoxType::BlockNode(styled_node)
@@ -52,7 +102,7 @@ fn render_specific_traits(list: &mut Vec<RenderCommand>, layout_box: &LayoutBox)
         | BoxType::FlexNode(styled_node) => {
             match &styled_node.node.node_type {
                 NodeType::Box() => {} // Box doesn't have any specific rendering traits
-                NodeType::Text(text_node_data) => {
+                NodeType::Text(_text_node_data) => {
                     // TODO: render text
                 }
             }
