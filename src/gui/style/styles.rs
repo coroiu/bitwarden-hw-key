@@ -96,3 +96,24 @@ pub enum FlexDirection {
     Row,
     Column,
 }
+
+// Convenience traits for working with styles
+pub trait SizeFluentPixels {
+    fn px(self) -> Size;
+}
+
+impl SizeFluentPixels for i32 {
+    fn px(self) -> Size {
+        Size::Pixels(self)
+    }
+}
+
+pub trait SizeFluentPercentage {
+    fn percent(self) -> Size;
+}
+
+impl SizeFluentPercentage for f32 {
+    fn percent(self) -> Size {
+        Size::Percentage(self)
+    }
+}

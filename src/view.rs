@@ -7,7 +7,7 @@ use crate::gui::{
     },
     primitives::Color,
     render::Canvas,
-    style::styles::{Display, EdgeSizes, Size, Styles},
+    style::styles::{Display, EdgeSizes, Size, SizeFluentPixels, Styles},
 };
 
 pub fn create_view(width: u32, height: u32) -> Document {
@@ -19,7 +19,7 @@ pub fn create_view(width: u32, height: u32) -> Document {
             style: Some(Styles {
                 display: Display::Flex,
                 background_color: Color::white().into(),
-                width: Size::Pixels(30).into(),
+                width: 30.px().into(),
                 height: Size::Auto.into(),
                 ..Default::default()
             }),
@@ -48,11 +48,11 @@ pub fn create_view(width: u32, height: u32) -> Document {
                 display: Display::Flex,
                 background_color: Color::white().into(),
                 border_color: Color::white().into(),
-                width: Size::Pixels(30).into(),
+                width: 30.px().into(),
                 height: Size::Auto.into(),
-                border: EdgeSizes::all(Size::Pixels(1)).into(),
-                padding: EdgeSizes::all(Size::Pixels(1)).into(),
-                margin: EdgeSizes::all(Size::Pixels(1)).into(),
+                border: EdgeSizes::all(1.px()).into(),
+                padding: EdgeSizes::all(1.px()).into(),
+                margin: EdgeSizes::all(1.px()).into(),
                 ..Default::default()
             }),
             ..Default::default()
