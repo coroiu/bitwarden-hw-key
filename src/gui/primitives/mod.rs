@@ -1,4 +1,4 @@
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -6,7 +6,7 @@ pub struct Color {
     pub a: u8,
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Rectangle {
     pub x: i32,
     pub y: i32,
@@ -14,7 +14,7 @@ pub struct Rectangle {
     pub height: u32,
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Edges {
     pub top: i32,
     pub right: i32,

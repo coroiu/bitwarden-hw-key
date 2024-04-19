@@ -2,7 +2,10 @@ use crate::gui::{
     layout::layout_tree::build_layout_tree,
     primitives::Rectangle,
     render::{paint, Canvas},
-    style::style_tree::build_style_tree,
+    style::{
+        style_tree::build_style_tree,
+        styles::{Display, Size, Styles},
+    },
 };
 
 use super::node::{Attributes, Node, NodeType};
@@ -16,7 +19,24 @@ pub struct Document {
 impl Document {
     pub fn new(width: u32, height: u32) -> Self {
         Document {
-            root: Node::new(NodeType::Box(), Attributes::default()),
+            root: Node::new(
+                NodeType::Box(),
+                Attributes {
+                    style: Some(Styles {
+                        display: Display::Flex,
+                        width: Some(Size::Pixels(width as i32)),
+                        height: Some(Size::Pixels(height as i32)),
+                        background_color: Some(crate::gui::primitives::Color {
+                            r: 10,
+                            g: 10,
+                            b: 10,
+                            a: 10,
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+            ),
             width,
             height,
         }

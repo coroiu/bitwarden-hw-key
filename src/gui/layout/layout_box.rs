@@ -12,11 +12,12 @@ pub(crate) struct LayoutBox<'a> {
 #[derive(Clone, Copy)]
 pub(crate) enum BoxType<'a> {
     BlockNode(&'a StyledNode<'a>),
+    FlexNode(&'a StyledNode<'a>),
     InlineNode(&'a StyledNode<'a>),
     AnonymousBlock,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct Dimensions {
     pub(crate) content: Rectangle,
     pub(crate) padding: Edges,
@@ -58,7 +59,9 @@ impl<'a> LayoutBox<'a> {
     pub(crate) fn add_child(&mut self, child: LayoutBox<'a>) {
         match child.box_type {
             BoxType::InlineNode(_) => match self.box_type {
-                BoxType::InlineNode(_) | BoxType::AnonymousBlock => self.children.push(child),
+                BoxType::InlineNode(_) | BoxType::FlexNode(_) | BoxType::AnonymousBlock => {
+                    self.children.push(child)
+                }
                 BoxType::BlockNode(_) => {
                     // Where are a block node, so we need to create an anonymous block box to hold this inline box.
                     // Make sure the last child is an anonymous block box where we can put this inline box.
@@ -74,6 +77,9 @@ impl<'a> LayoutBox<'a> {
                 }
             },
             BoxType::BlockNode(_) => {
+                self.children.push(child);
+            }
+            BoxType::FlexNode(_) => {
                 self.children.push(child);
             }
             _ => {}
@@ -94,8 +100,118 @@ impl<'a> LayoutBox<'a> {
     fn layout_as_child(&mut self, containing_block: &Dimensions) {
         match self.box_type {
             BoxType::BlockNode(_) => self.layout_block(containing_block),
+            BoxType::FlexNode(styled_node) => self.layout_flex(styled_node, containing_block),
             BoxType::InlineNode(_) => {}
             BoxType::AnonymousBlock => {}
+        }
+    }
+
+    fn layout_flex(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {
+        self.calculate_flex_width(styled_node, containing_block);
+        self.calculate_flex_height(styled_node, containing_block);
+        self.layout_flex_children(styled_node, containing_block);
+
+        log::info!("Flex layout: {:?}", self.dimensions);
+    }
+
+    fn calculate_flex_width(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {
+        // Assume flex-direction: row;
+        let style = styled_node.style;
+
+        // // We don't expect the content width to be so big that we overflow an i32
+        let containing_width = containing_block.content.width.try_into().unwrap();
+
+        // width defaults to auto
+        // TODO: Width should be a result of the children's widths
+        let width = style.width.unwrap_or(Size::Auto);
+
+        // margins, borders, and paddings default to 0
+        let margin_left = style.margin.and_then(|m| m.left).unwrap_or(Size::zero());
+        let margin_right = style.margin.and_then(|m| m.right).unwrap_or(Size::zero());
+
+        let border_left = style.border.and_then(|b| b.left).unwrap_or(Size::zero());
+        let border_right = style.border.and_then(|b| b.right).unwrap_or(Size::zero());
+
+        let padding_left = style.padding.and_then(|p| p.left).unwrap_or(Size::zero());
+        let padding_right = style.padding.and_then(|p| p.right).unwrap_or(Size::zero());
+
+        let d = &mut self.dimensions;
+        d.content.width = width.to_pixels(containing_width).try_into().unwrap();
+
+        d.padding.left = padding_left.to_pixels(containing_width);
+        d.padding.right = padding_right.to_pixels(containing_width);
+
+        d.border.left = border_left.to_pixels(containing_width);
+        d.border.right = border_right.to_pixels(containing_width);
+
+        d.margin.left = margin_left.to_pixels(containing_width);
+        d.margin.right = margin_right.to_pixels(containing_width);
+    }
+
+    fn calculate_flex_height(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {
+        // Assume flex-direction: row;
+        let style = styled_node.style;
+
+        // We don't expect the content width to be so big that we overflow an i32
+        let containing_height = containing_block.content.height.try_into().unwrap();
+
+        // width defaults to auto
+        let mut height = style.height.unwrap_or(Size::Auto);
+
+        // margins, borders, and paddings default to 0
+        let margin_top = style.margin.and_then(|m| m.top).unwrap_or(Size::zero());
+        let margin_bottom = style.margin.and_then(|m| m.bottom).unwrap_or(Size::zero());
+
+        let border_top = style.border.and_then(|b| b.top).unwrap_or(Size::zero());
+        let border_bottom = style.border.and_then(|b| b.bottom).unwrap_or(Size::zero());
+
+        let padding_top = style.padding.and_then(|p| p.top).unwrap_or(Size::zero());
+        let padding_bottom = style.padding.and_then(|p| p.bottom).unwrap_or(Size::zero());
+
+        let total: i32 = [
+            &margin_top,
+            &margin_bottom,
+            &border_top,
+            &border_bottom,
+            &padding_top,
+            &padding_bottom,
+            &height,
+        ]
+        .iter()
+        .map(|v| v.to_pixels(containing_height))
+        .sum();
+
+        let underflow = containing_height - total;
+
+        // if height is auto and there is space left in the container, fill it
+        match height {
+            Size::Auto if underflow >= 0 => {
+                height = Size::Pixels(underflow);
+            }
+            _ => {}
+        }
+
+        // TODO: Adjust margin_top and margin_bottom based on justification, underflow, etc.
+
+        let d = &mut self.dimensions;
+        d.content.height = height.to_pixels(containing_height).try_into().unwrap();
+
+        d.padding.top = padding_top.to_pixels(containing_height);
+        d.padding.bottom = padding_bottom.to_pixels(containing_height);
+
+        d.border.top = border_top.to_pixels(containing_height);
+        d.border.bottom = border_bottom.to_pixels(containing_height);
+
+        d.margin.top = margin_top.to_pixels(containing_height);
+        d.margin.bottom = margin_bottom.to_pixels(containing_height);
+    }
+
+    fn layout_flex_children(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {
+        let d = &mut self.dimensions;
+        for child in &mut self.children {
+            child.layout_as_child(d);
+            // Track the height so each child is laid out below the previous content.
+            // d.content.height = d.content.height + child.dimensions.margin_box().height;
         }
     }
 

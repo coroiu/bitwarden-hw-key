@@ -14,22 +14,24 @@ pub struct Canvas {
 
 impl Canvas {
     fn new(width: usize, height: usize) -> Canvas {
-        let white = Color {
-            r: 255,
-            g: 255,
-            b: 255,
-            a: 255,
+        let black = Color {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 0,
         };
         return Canvas {
-            pixels: repeat(white).take(width * height).collect(),
+            pixels: repeat(black).take(width * height).collect(),
             width: width,
             height: height,
         };
     }
 
-    fn paint_item(&mut self, item: &RenderCommand) {
-        match item {
+    fn paint_command(&mut self, command: &RenderCommand) {
+        match command {
             &RenderCommand::SolidColor(color, rect) => {
+                log::info!("Painting {:?} at {:?}", color, rect);
+
                 // Clip the rectangle to the canvas boundaries.
                 let x0 = rect.x.clamp(0, self.width as i32) as usize;
                 let y0 = rect.y.clamp(0, self.height as i32) as usize;
@@ -51,7 +53,7 @@ pub fn paint(layout_root: &LayoutBox, bounds: Rectangle) -> Canvas {
     let display_list = build_render_commands(layout_root);
     let mut canvas = Canvas::new(bounds.width as usize, bounds.height as usize);
     for item in display_list {
-        canvas.paint_item(&item);
+        canvas.paint_command(&item);
     }
     return canvas;
 }

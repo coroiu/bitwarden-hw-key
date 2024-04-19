@@ -16,11 +16,12 @@ pub struct Styles {
 pub enum Display {
     #[default]
     Block,
+    Flex,
     Inline,
     None,
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum Size {
     #[default]
     Auto,

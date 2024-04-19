@@ -17,7 +17,7 @@ pub fn create_view(width: u32, height: u32) -> Document {
         NodeType::Box(),
         Attributes {
             style: Some(Styles {
-                display: Display::Block,
+                display: Display::Flex,
                 background_color: Some(Color {
                     r: 255,
                     g: 255,
@@ -32,31 +32,31 @@ pub fn create_view(width: u32, height: u32) -> Document {
         },
     ));
 
-    document.children_mut().push(Node::new(
-        NodeType::Text(TextNodeData {
-            text: "Hello, ".to_string(),
-        }),
-        Attributes {
-            style: Some(Styles {
-                display: Display::Inline,
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    ));
+    // document.children_mut().push(Node::new(
+    //     NodeType::Text(TextNodeData {
+    //         text: "Hello, ".to_string(),
+    //     }),
+    //     Attributes {
+    //         style: Some(Styles {
+    //             display: Display::Inline,
+    //             ..Default::default()
+    //         }),
+    //         ..Default::default()
+    //     },
+    // ));
 
-    document.children_mut().push(Node::new(
-        NodeType::Text(TextNodeData {
-            text: "world!".to_string(),
-        }),
-        Attributes {
-            style: Some(Styles {
-                display: Display::Inline,
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    ));
+    // document.children_mut().push(Node::new(
+    //     NodeType::Text(TextNodeData {
+    //         text: "world!".to_string(),
+    //     }),
+    //     Attributes {
+    //         style: Some(Styles {
+    //             display: Display::Inline,
+    //             ..Default::default()
+    //         }),
+    //         ..Default::default()
+    //     },
+    // ));
 
     document
 }
