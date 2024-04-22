@@ -64,12 +64,13 @@ pub fn create_view(width: u32, height: u32) -> Document {
 
     document.children_mut().push(Node::new(
         NodeType::Text(TextNodeData {
-            text: "Hello, ".to_string(),
+            text: "H".to_string(),
             font: &FONT_6X9,
         }),
         Attributes {
             style: Some(Styles {
-                display: Display::Inline,
+                display: Display::Flex,
+                width: 7.px().into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -78,12 +79,58 @@ pub fn create_view(width: u32, height: u32) -> Document {
 
     document.children_mut().push(Node::new(
         NodeType::Text(TextNodeData {
-            text: "world!".to_string(),
+            text: "e".to_string(),
             font: &FONT_6X9,
         }),
         Attributes {
             style: Some(Styles {
-                display: Display::Inline,
+                display: Display::Flex,
+                width: 7.px().into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    ));
+
+    document.children_mut().push(Node::new(
+        NodeType::Text(TextNodeData {
+            text: "l".to_string(),
+            font: &FONT_6X9,
+        }),
+        Attributes {
+            style: Some(Styles {
+                display: Display::Flex,
+                width: 7.px().into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    ));
+
+    document.children_mut().push(Node::new(
+        NodeType::Text(TextNodeData {
+            text: "l".to_string(),
+            font: &FONT_6X9,
+        }),
+        Attributes {
+            style: Some(Styles {
+                display: Display::Flex,
+                width: 7.px().into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    ));
+
+    document.children_mut().push(Node::new(
+        NodeType::Text(TextNodeData {
+            text: "o".to_string(),
+            font: &FONT_6X9,
+        }),
+        Attributes {
+            style: Some(Styles {
+                display: Display::Flex,
+                width: 7.px().into(),
                 ..Default::default()
             }),
             ..Default::default()

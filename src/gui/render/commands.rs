@@ -1,7 +1,7 @@
 use crate::gui::{
     document::node::NodeType,
     layout::layout_box::{BoxType, LayoutBox},
-    primitives::{Color, Point, Rectangle},
+    primitives::{Color, Rectangle},
     style::font::Font,
 };
 

@@ -22,21 +22,14 @@ impl Canvas {
             RenderCommand::SolidColor(color, rect) => {
                 SolidColor::new(*color).draw(&mut self.image_buffer, *rect);
             }
-            RenderCommand::Text(color, rect, text, font) => {
-                // let first_character = text.chars().next().unwrap();
-                // let font_character = font.get_character(first_character);
+            // TODO: Implement re-coloring fonts
+            RenderCommand::Text(_color, rect, text, font) => {
+                let first_character = text.chars().next().unwrap();
+                let font_character = font.get_character(first_character);
 
-                // let x0 = rect.x.clamp(0, self.width as i32) as usize;
-                // let y0 = rect.y.clamp(0, self.height as i32) as usize;
-                // let x1 = (rect.x + rect.width as i32).clamp(0, self.width as i32) as usize;
-                // let y1 = (rect.y + rect.height as i32).clamp(0, self.height as i32) as usize;
-
-                // for y in y0..y1 {
-                //     for x in x0..x1 {
-                //         // TODO: alpha compositing with existing pixe
-                //         self.pixels[x + y * self.width] = *color;
-                //     }
-                // }
+                font_character
+                    .image_buffer
+                    .draw(&mut self.image_buffer, *rect);
             }
         }
     }

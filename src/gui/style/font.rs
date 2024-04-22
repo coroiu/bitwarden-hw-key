@@ -5,7 +5,7 @@ use embedded_graphics::{
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
-use crate::gui::primitives::Color;
+use crate::gui::{primitives::Color, render::ImageBuffer};
 
 // ASCII subset
 const SUPPORTED_CHARACTERS: [char; 95] = [
@@ -19,14 +19,12 @@ const SUPPORTED_CHARACTERS: [char; 95] = [
 pub static FONT_6X9: Lazy<Font> =
     Lazy::new(|| Font::from_embedded_graphics_font(&embedded_graphics::mono_font::ascii::FONT_6X9));
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Character {
-    pub width: u32,
-    pub height: u32,
-    pub data: Vec<Color>,
+    pub image_buffer: ImageBuffer,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct Font {
     characters: &'static HashMap<char, Character>,
 }
@@ -51,9 +49,11 @@ impl Font {
             sub_image.draw(&mut draw_target).unwrap();
 
             let character = Character {
-                width: size.width,
-                height: size.height,
-                data: draw_target.buffer,
+                image_buffer: ImageBuffer {
+                    width: size.width as usize,
+                    height: size.height as usize,
+                    pixels: draw_target.buffer,
+                },
             };
 
             characters.insert(*c, character);

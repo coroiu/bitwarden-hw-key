@@ -54,6 +54,44 @@ impl Rectangle {
             height: self.height + (edges.top + edges.bottom) as u32,
         }
     }
+
+    pub fn intersect(&self, b: Rectangle) -> Intersection {
+        let x0 = self.x.max(b.x);
+        let y0 = self.y.max(b.y);
+        let x1 = (self.x + self.width as i32).min(b.x + b.width as i32);
+        let y1 = (self.y + self.height as i32).min(b.y + b.height as i32);
+
+        let bounds = Rectangle {
+            x: x0,
+            y: y0,
+            width: (x1 - x0).max(0) as u32,
+            height: (y1 - y0).max(0) as u32,
+        };
+
+        Intersection {
+            bounds,
+            offset_a: Point {
+                x: bounds.x - self.x,
+                y: bounds.y - self.y,
+            },
+            offset_b: Point {
+                x: bounds.x - b.x,
+                y: bounds.y - b.y,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Intersection {
+    /// The area of the intersection between two rectangles.
+    pub bounds: Rectangle,
+
+    /// The offset of the intersection relative to the first rectangle.
+    pub offset_a: Point,
+
+    /// The offset of the intersection relative to the second rectangle.
+    pub offset_b: Point,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
