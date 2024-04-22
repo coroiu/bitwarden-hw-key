@@ -17,7 +17,7 @@ impl Canvas {
         };
     }
 
-    fn paint_command(&mut self, command: &RenderCommand) {
+    fn execute(&mut self, command: &RenderCommand) {
         match &command {
             RenderCommand::SolidColor(color, rect) => {
                 SolidColor::new(*color).draw(&mut self.image_buffer, *rect);
@@ -35,11 +35,11 @@ impl Canvas {
     }
 }
 
-pub fn paint(layout_root: &LayoutBox, bounds: Rectangle) -> Canvas {
+pub fn draw(layout_root: &LayoutBox, bounds: Rectangle) -> Canvas {
     let display_list = build_render_commands(layout_root);
     let mut canvas = Canvas::new(bounds.width as usize, bounds.height as usize);
     for item in display_list {
-        canvas.paint_command(&item);
+        canvas.execute(&item);
     }
     return canvas;
 }

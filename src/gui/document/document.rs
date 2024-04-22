@@ -1,7 +1,7 @@
 use crate::gui::{
     layout::layout_tree::build_layout_tree,
     primitives::{Color, Rectangle},
-    render::{paint, Canvas},
+    render::{draw, Canvas},
     style::{
         style_tree::build_style_tree,
         styles::{Display, Size, Styles},
@@ -52,6 +52,6 @@ impl Document {
         let style_root = build_style_tree(&self.root);
         let mut layout_root = build_layout_tree(&style_root);
         layout_root.layout(bounds);
-        paint(&layout_root, bounds)
+        draw(&layout_root, bounds)
     }
 }
