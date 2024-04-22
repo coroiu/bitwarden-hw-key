@@ -101,21 +101,26 @@ impl Drawable for Canvas {
     where
         D: embedded_graphics::prelude::DrawTarget<Color = Self::Color>,
     {
-        let pixels = self.pixels.iter().enumerate().map(|(i, color)| {
-            let x = i % self.width;
-            let y = i / self.width;
+        let pixels = self
+            .image_buffer
+            .pixels
+            .iter()
+            .enumerate()
+            .map(|(i, color)| {
+                let x = i % self.image_buffer.width;
+                let y = i / self.image_buffer.width;
 
-            let combined_colors = color.r as i32 + color.g as i32 + color.b as i32;
-            let mapped_color = match combined_colors {
-                c if c > 300 => BinaryColor::On,
-                _ => BinaryColor::Off,
-            };
+                let combined_colors = color.r as i32 + color.g as i32 + color.b as i32;
+                let mapped_color = match combined_colors {
+                    c if c > 300 => BinaryColor::On,
+                    _ => BinaryColor::Off,
+                };
 
-            embedded_graphics::Pixel(
-                embedded_graphics::geometry::Point::new(x as i32, y as i32),
-                mapped_color,
-            )
-        });
+                embedded_graphics::Pixel(
+                    embedded_graphics::geometry::Point::new(x as i32, y as i32),
+                    mapped_color,
+                )
+            });
 
         target.draw_iter(pixels)
     }
