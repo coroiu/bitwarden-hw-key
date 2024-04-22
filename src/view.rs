@@ -64,73 +64,13 @@ pub fn create_view(width: u32, height: u32) -> Document {
 
     document.children_mut().push(Node::new(
         NodeType::Text(TextNodeData {
-            text: "H".to_string(),
+            text: "Hello, world".to_string(),
             font: &FONT_6X9,
         }),
         Attributes {
             style: Some(Styles {
                 display: Display::Flex,
-                width: 7.px().into(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    ));
-
-    document.children_mut().push(Node::new(
-        NodeType::Text(TextNodeData {
-            text: "e".to_string(),
-            font: &FONT_6X9,
-        }),
-        Attributes {
-            style: Some(Styles {
-                display: Display::Flex,
-                width: 7.px().into(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    ));
-
-    document.children_mut().push(Node::new(
-        NodeType::Text(TextNodeData {
-            text: "l".to_string(),
-            font: &FONT_6X9,
-        }),
-        Attributes {
-            style: Some(Styles {
-                display: Display::Flex,
-                width: 7.px().into(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    ));
-
-    document.children_mut().push(Node::new(
-        NodeType::Text(TextNodeData {
-            text: "l".to_string(),
-            font: &FONT_6X9,
-        }),
-        Attributes {
-            style: Some(Styles {
-                display: Display::Flex,
-                width: 7.px().into(),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    ));
-
-    document.children_mut().push(Node::new(
-        NodeType::Text(TextNodeData {
-            text: "o".to_string(),
-            font: &FONT_6X9,
-        }),
-        Attributes {
-            style: Some(Styles {
-                display: Display::Flex,
-                width: 7.px().into(),
+                width: 67.px().into(),
                 ..Default::default()
             }),
             ..Default::default()

@@ -3,6 +3,7 @@ use super::{
     drawable::Drawable,
     image_buffer::ImageBuffer,
     solid_color::SolidColor,
+    text::Text,
 };
 use crate::gui::{layout::layout_box::LayoutBox, primitives::Rectangle};
 
@@ -24,12 +25,7 @@ impl Canvas {
             }
             // TODO: Implement re-coloring fonts
             RenderCommand::Text(_color, rect, text, font) => {
-                let first_character = text.chars().next().unwrap();
-                let font_character = font.get_character(first_character);
-
-                font_character
-                    .image_buffer
-                    .draw(&mut self.image_buffer, *rect);
+                Text::new(text.clone(), font).draw(&mut self.image_buffer, *rect);
             }
         }
     }

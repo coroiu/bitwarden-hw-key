@@ -27,6 +27,7 @@ pub struct Character {
 #[derive(Clone, Copy)]
 pub struct Font {
     characters: &'static HashMap<char, Character>,
+    pub letter_spacing: u32,
 }
 
 impl Font {
@@ -61,6 +62,7 @@ impl Font {
 
         return Font {
             characters: Box::leak(characters),
+            letter_spacing: font.character_spacing as u32,
         };
     }
 }
