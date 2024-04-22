@@ -1,4 +1,4 @@
-use crate::gui::style::styles::Styles;
+use crate::gui::style::{font::Font, styles::Styles};
 
 pub struct Node {
     pub children: Vec<Node>,
@@ -32,6 +32,7 @@ pub enum NodeType {
 
 pub struct TextNodeData {
     pub text: String,
+    pub font: &'static Font,
 }
 
 impl Node {

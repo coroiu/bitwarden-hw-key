@@ -21,19 +21,19 @@ impl Color {
 }
 
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Rectangle {
-    pub x: i32,
-    pub y: i32,
-    pub width: u32,
-    pub height: u32,
-}
-
-#[derive(Debug, Default, Clone, Copy)]
 pub struct Edges {
     pub top: i32,
     pub right: i32,
     pub bottom: i32,
     pub left: i32,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Rectangle {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl Rectangle {
@@ -53,5 +53,21 @@ impl Rectangle {
             width: self.width + (edges.left + edges.right) as u32,
             height: self.height + (edges.top + edges.bottom) as u32,
         }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Point {
+    pub x: i32,
+    pub y: i32,
+}
+
+impl Point {
+    pub fn new(x: i32, y: i32) -> Point {
+        Point { x, y }
+    }
+
+    pub fn zero() -> Point {
+        Point { x: 0, y: 0 }
     }
 }

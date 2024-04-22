@@ -1,6 +1,6 @@
 use crate::gui::primitives::Color;
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 pub struct Styles {
     pub display: Display,
     pub color: Option<Color>,

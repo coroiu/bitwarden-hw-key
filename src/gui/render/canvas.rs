@@ -28,8 +28,8 @@ impl Canvas {
     }
 
     fn paint_command(&mut self, command: &RenderCommand) {
-        match command {
-            &RenderCommand::SolidColor(color, rect) => {
+        match &command {
+            RenderCommand::SolidColor(color, rect) => {
                 // Clip the rectangle to the canvas boundaries.
                 let x0 = rect.x.clamp(0, self.width as i32) as usize;
                 let y0 = rect.y.clamp(0, self.height as i32) as usize;
@@ -38,8 +38,24 @@ impl Canvas {
 
                 for y in y0..y1 {
                     for x in x0..x1 {
-                        // TODO: alpha compositing with existing pixel
-                        self.pixels[x + y * self.width] = color;
+                        // TODO: alpha compositing with existing pixe
+                        self.pixels[x + y * self.width] = *color;
+                    }
+                }
+            }
+            RenderCommand::Text(color, rect, text, font) => {
+                let first_character = text.chars().next().unwrap();
+                let font_character = font.get_character(first_character);
+
+                let x0 = rect.x.clamp(0, self.width as i32) as usize;
+                let y0 = rect.y.clamp(0, self.height as i32) as usize;
+                let x1 = (rect.x + rect.width as i32).clamp(0, self.width as i32) as usize;
+                let y1 = (rect.y + rect.height as i32).clamp(0, self.height as i32) as usize;
+
+                for y in y0..y1 {
+                    for x in x0..x1 {
+                        // TODO: alpha compositing with existing pixe
+                        self.pixels[x + y * self.width] = *color;
                     }
                 }
             }

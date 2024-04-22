@@ -2,12 +2,15 @@ use embedded_graphics::{pixelcolor::BinaryColor, Drawable};
 
 use crate::gui::{
     document::{
-        node::{Attributes, Node, NodeType},
+        node::{Attributes, Node, NodeType, TextNodeData},
         Document,
     },
     primitives::Color,
     render::Canvas,
-    style::styles::{Display, EdgeSizes, Size, SizeFluentPixels, Styles},
+    style::{
+        font::FONT_6X9,
+        styles::{Display, EdgeSizes, Size, SizeFluentPixels, Styles},
+    },
 };
 
 pub fn create_view(width: u32, height: u32) -> Document {
@@ -59,31 +62,33 @@ pub fn create_view(width: u32, height: u32) -> Document {
         },
     ));
 
-    // document.children_mut().push(Node::new(
-    //     NodeType::Text(TextNodeData {
-    //         text: "Hello, ".to_string(),
-    //     }),
-    //     Attributes {
-    //         style: Some(Styles {
-    //             display: Display::Inline,
-    //             ..Default::default()
-    //         }),
-    //         ..Default::default()
-    //     },
-    // ));
+    document.children_mut().push(Node::new(
+        NodeType::Text(TextNodeData {
+            text: "Hello, ".to_string(),
+            font: &FONT_6X9,
+        }),
+        Attributes {
+            style: Some(Styles {
+                display: Display::Inline,
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    ));
 
-    // document.children_mut().push(Node::new(
-    //     NodeType::Text(TextNodeData {
-    //         text: "world!".to_string(),
-    //     }),
-    //     Attributes {
-    //         style: Some(Styles {
-    //             display: Display::Inline,
-    //             ..Default::default()
-    //         }),
-    //         ..Default::default()
-    //     },
-    // ));
+    document.children_mut().push(Node::new(
+        NodeType::Text(TextNodeData {
+            text: "world!".to_string(),
+            font: &FONT_6X9,
+        }),
+        Attributes {
+            style: Some(Styles {
+                display: Display::Inline,
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    ));
 
     document
 }

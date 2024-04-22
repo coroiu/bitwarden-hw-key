@@ -138,7 +138,7 @@ impl<'a> LayoutBox<'a> {
     fn calculate_flex_width(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {
         match styled_node.style.flex_direction.unwrap_or_default() {
             FlexDirection::Row => {
-                let style = styled_node.style;
+                let style = &styled_node.style;
 
                 // // We don't expect the content width to be so big that we overflow an i32
                 let containing_width = containing_block.content.width.try_into().unwrap();
@@ -194,7 +194,7 @@ impl<'a> LayoutBox<'a> {
 
     fn calculate_flex_height(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {
         // Assume flex-direction: row;
-        let style = styled_node.style;
+        let style = &styled_node.style;
 
         // We don't expect the content width to be so big that we overflow an i32
         let containing_height = containing_block.content.height.try_into().unwrap();
