@@ -8,7 +8,7 @@ use crate::gui::{
     primitives::Color,
     render::Canvas,
     style::{
-        font::FONT_6X9,
+        font::FONT_5X8,
         styles::{Display, EdgeSizes, Size, SizeFluentPixels, Styles},
     },
 };
@@ -65,7 +65,7 @@ pub fn create_view(width: u32, height: u32) -> Document {
     document.children_mut().push(Node::new(
         NodeType::Text(TextNodeData {
             text: "Hello, world".to_string(),
-            font: &FONT_6X9,
+            font: &FONT_5X8,
         }),
         Attributes {
             style: Some(Styles {

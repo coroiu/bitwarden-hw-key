@@ -16,8 +16,12 @@ const SUPPORTED_CHARACTERS: [char; 95] = [
     '-', '.', '/', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
 ];
 
+#[allow(dead_code)]
 pub static FONT_6X9: Lazy<Font> =
     Lazy::new(|| Font::from_embedded_graphics_font(&embedded_graphics::mono_font::ascii::FONT_6X9));
+#[allow(dead_code)]
+pub static FONT_5X8: Lazy<Font> =
+    Lazy::new(|| Font::from_embedded_graphics_font(&embedded_graphics::mono_font::ascii::FONT_5X8));
 
 #[derive(Clone)]
 pub struct Character {
