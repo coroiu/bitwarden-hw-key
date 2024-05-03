@@ -5,6 +5,7 @@ use crate::gui::{
         node::{Attributes, Node, NodeType, TextNodeData},
         Document,
     },
+    input::InputInterface,
     primitives::Color,
     render::Canvas,
     style::{
@@ -13,8 +14,8 @@ use crate::gui::{
     },
 };
 
-pub fn create_view(width: u32, height: u32) -> Document {
-    let mut document = Document::new(width, height);
+pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> Document {
+    let mut document = Document::new(width, height, input);
 
     document.children_mut().push(Node::new(
         NodeType::Box(),

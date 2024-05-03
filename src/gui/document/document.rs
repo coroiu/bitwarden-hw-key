@@ -1,4 +1,5 @@
 use crate::gui::{
+    input::InputInterface,
     layout::layout_tree::build_layout_tree,
     primitives::{Color, Rectangle},
     render::{draw, Canvas},
@@ -18,10 +19,12 @@ pub struct Document {
     pub(super) tab_index: u32,
     width: u32,
     height: u32,
+    // Boxed so we don't have to add generic variable to every place that references Documents
+    input: Box<dyn InputInterface>,
 }
 
 impl Document {
-    pub fn new(width: u32, height: u32) -> Self {
+    pub fn new(width: u32, height: u32, input: Box<dyn InputInterface>) -> Self {
         Document {
             root: Node::new(
                 NodeType::Box(),
@@ -42,6 +45,7 @@ impl Document {
             width,
             height,
             tab_index: 0,
+            input,
         }
     }
 
@@ -54,7 +58,12 @@ impl Document {
         &mut self.root.children
     }
 
+    pub fn update_input(&mut self) {
+        self.input.update();
+    }
+
     pub fn update(&mut self) {
+        self.handle_input();
         self.assign_tab_index();
         self.assign_states();
     }
@@ -66,6 +75,19 @@ impl Document {
         let mut layout_root = build_layout_tree(&style_root);
         layout_root.layout(bounds);
         draw(&layout_root, bounds)
+    }
+
+    fn handle_input(&mut self) {
+        let events = self.input.get_events();
+        for event in events {
+            log::info!("Event: {:?}", event);
+            // match event.key_event {
+            //     KeyEvent::Clicked => {
+            //         self.tab_index = (self.tab_index + 1) % 3;
+            //     }
+            //     _ => {}
+            // }
+        }
     }
 
     fn assign_tab_index(&mut self) {

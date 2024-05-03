@@ -1,7 +1,9 @@
+mod esp_input;
 mod gui;
 mod view;
 
 use embedded_graphics::{geometry::Point, image::Image, Drawable};
+use esp_idf_hal::gpio::InputPin;
 use esp_idf_svc::{
     hal::{
         delay::FreeRtos,
@@ -13,7 +15,7 @@ use esp_idf_svc::{
 };
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
-use crate::{gui::icons::BITWARDEN_LOGO, view::create_view};
+use crate::{esp_input::EspInput, gui::icons::BITWARDEN_LOGO, view::create_view};
 
 fn main() -> Result<(), EspError> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -76,22 +78,46 @@ fn main() -> Result<(), EspError> {
      *   SETUP VIEWS   *
      *******************/
 
-    let mut document = create_view(128, 32);
-    document.update();
-    let canvas = document.draw();
-    canvas.draw(&mut display).unwrap();
-    display.flush().unwrap();
+    let mut input = Box::new(EspInput::new(vec![
+        (
+            gui::input::KeyCode::Up,
+            PinDriver::input(peripherals.pins.gpio15.downgrade_input())?,
+        ),
+        (
+            gui::input::KeyCode::Middle,
+            PinDriver::input(peripherals.pins.gpio32.downgrade_input())?,
+        ),
+        (
+            gui::input::KeyCode::Down,
+            PinDriver::input(peripherals.pins.gpio14.downgrade_input())?,
+        ),
+    ]));
+
+    let mut document = create_view(128, 32, input);
+
+    let loops = 1000;
+    loop {
+        document.update_input();
+        document.update();
+        let canvas = document.draw();
+        canvas.draw(&mut display).unwrap();
+        display.flush().unwrap();
+
+        if --loops == 0 {
+            break;
+        }
+
+        // Sleeping here to make sure the watchdog isn't triggered
+        FreeRtos::delay_ms(50); // 20 fps
+    }
 
     log::info!("Test draw finished");
-
-    FreeRtos::delay_ms(30000);
 
     log::info!("Clearing display");
     display.clear_buffer();
     display.flush().unwrap();
 
     loop {
-        // Sleeping here to make sure the watchdog isn't triggered
         FreeRtos::delay_ms(500);
     }
 }
