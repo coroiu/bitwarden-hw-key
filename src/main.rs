@@ -3,14 +3,9 @@ mod gui;
 mod time;
 mod view;
 
-use std::{
-    borrow::{Borrow, BorrowMut},
-    time::Duration,
-};
+use std::time::Duration;
 
-use button_driver::PinWrapper;
 use embedded_graphics::{geometry::Point, image::Image, Drawable};
-use esp_idf_hal::gpio::{AnyInputPin, Input, InputPin, Pin};
 use esp_idf_svc::{
     hal::{
         delay::FreeRtos,
@@ -98,9 +93,18 @@ fn main() -> Result<(), EspError> {
     pin_driver_14.set_pull(esp_idf_hal::gpio::Pull::Up)?;
 
     let input = Box::new(EspInput::new(vec![
-        (gui::input::KeyCode::Up, EspPinWrapper(pin_driver_15)),
-        // (gui::input::KeyCode::Middle, EspPinWrapper(pin_driver_32)),
-        // (gui::input::KeyCode::Down, EspPinWrapper(pin_driver_14)),
+        (
+            gui::input::KeyCode::Up,
+            Box::new(EspPinWrapper(pin_driver_15)),
+        ),
+        (
+            gui::input::KeyCode::Middle,
+            Box::new(EspPinWrapper(pin_driver_32)),
+        ),
+        (
+            gui::input::KeyCode::Down,
+            Box::new(EspPinWrapper(pin_driver_14)),
+        ),
     ]));
 
     let mut document = create_view(128, 32, input);

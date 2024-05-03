@@ -3,18 +3,12 @@ use esp_idf_hal::gpio::{Input, PinDriver};
 
 use crate::gui::input::{InputEvent, InputInterface, KeyCode, KeyEvent};
 
-pub struct EspInput<P>
-where
-    P: PinWrapper,
-{
-    drivers: Vec<(KeyCode, Button<P>)>,
+pub struct EspInput {
+    drivers: Vec<(KeyCode, Button<Box<dyn MyPinWrapper>>)>,
 }
 
-impl<P> EspInput<P>
-where
-    P: PinWrapper,
-{
-    pub fn new(drivers: Vec<(KeyCode, P)>) -> Self {
+impl EspInput {
+    pub fn new(drivers: Vec<(KeyCode, Box<dyn MyPinWrapper>)>) -> Self {
         // drivers.into_iter().for_each(|(_, pin)| {
         //     pin.set_pull(esp_idf_hal::gpio::Pull::Up);
         // });
@@ -40,10 +34,7 @@ where
     }
 }
 
-impl<'a, P> InputInterface for EspInput<P>
-where
-    P: PinWrapper,
-{
+impl InputInterface for EspInput {
     fn get_events(&mut self) -> Vec<InputEvent> {
         let mut events = Vec::new();
 
@@ -86,17 +77,31 @@ where
 }
 
 pub type InputPinDriver<'a, P> = PinDriver<'a, P, Input>;
+
 pub struct EspPinWrapper<'a, P: esp_idf_hal::gpio::Pin>(pub InputPinDriver<'a, P>);
 
-impl<'a, P> PinWrapper for EspPinWrapper<'a, P>
-where
-    P: esp_idf_hal::gpio::Pin,
-{
-    fn is_high(&self) -> bool {
+// Used for erasing the type of the pin inside the driver
+pub trait MyPinWrapper {
+    fn is_high_wr(&self) -> bool;
+    fn is_low_wr(&self) -> bool;
+}
+
+impl<'a, P: esp_idf_hal::gpio::Pin> MyPinWrapper for EspPinWrapper<'a, P> {
+    fn is_high_wr(&self) -> bool {
         self.0.is_high()
     }
 
-    fn is_low(&self) -> bool {
+    fn is_low_wr(&self) -> bool {
         self.0.is_low()
+    }
+}
+
+impl PinWrapper for Box<dyn MyPinWrapper> {
+    fn is_high(&self) -> bool {
+        self.is_high_wr()
+    }
+
+    fn is_low(&self) -> bool {
+        self.is_low_wr()
     }
 }
