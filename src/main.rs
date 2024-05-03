@@ -1,9 +1,16 @@
 mod esp_input;
 mod gui;
+mod time;
 mod view;
 
+use std::{
+    borrow::{Borrow, BorrowMut},
+    time::Duration,
+};
+
+use button_driver::PinWrapper;
 use embedded_graphics::{geometry::Point, image::Image, Drawable};
-use esp_idf_hal::gpio::InputPin;
+use esp_idf_hal::gpio::{AnyInputPin, Input, InputPin, Pin};
 use esp_idf_svc::{
     hal::{
         delay::FreeRtos,
@@ -15,7 +22,12 @@ use esp_idf_svc::{
 };
 use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
 
-use crate::{esp_input::EspInput, gui::icons::BITWARDEN_LOGO, view::create_view};
+use crate::{
+    esp_input::{EspInput, EspPinWrapper},
+    gui::icons::BITWARDEN_LOGO,
+    time::timer::Timer,
+    view::create_view,
+};
 
 fn main() -> Result<(), EspError> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -78,37 +90,62 @@ fn main() -> Result<(), EspError> {
      *   SETUP VIEWS   *
      *******************/
 
-    let mut input = Box::new(EspInput::new(vec![
-        (
-            gui::input::KeyCode::Up,
-            PinDriver::input(peripherals.pins.gpio15.downgrade_input())?,
-        ),
-        (
-            gui::input::KeyCode::Middle,
-            PinDriver::input(peripherals.pins.gpio32.downgrade_input())?,
-        ),
-        (
-            gui::input::KeyCode::Down,
-            PinDriver::input(peripherals.pins.gpio14.downgrade_input())?,
-        ),
+    let mut pin_driver_15 = PinDriver::input(peripherals.pins.gpio15)?;
+    pin_driver_15.set_pull(esp_idf_hal::gpio::Pull::Up)?;
+    let mut pin_driver_32 = PinDriver::input(peripherals.pins.gpio32)?;
+    pin_driver_32.set_pull(esp_idf_hal::gpio::Pull::Up)?;
+    let mut pin_driver_14 = PinDriver::input(peripherals.pins.gpio14)?;
+    pin_driver_14.set_pull(esp_idf_hal::gpio::Pull::Up)?;
+
+    let input = Box::new(EspInput::new(vec![
+        (gui::input::KeyCode::Up, EspPinWrapper(pin_driver_15)),
+        // (gui::input::KeyCode::Middle, EspPinWrapper(pin_driver_32)),
+        // (gui::input::KeyCode::Down, EspPinWrapper(pin_driver_14)),
     ]));
 
     let mut document = create_view(128, 32, input);
 
-    let loops = 1000;
+    let mut update_timer = Timer::new(Duration::from_millis(25), true);
+    let mut draw_timer = Timer::new(Duration::from_millis(50), true);
+
+    update_timer.start();
+    draw_timer.start();
+
+    let mut turn_off_timer = Timer::new(Duration::from_secs(30), false);
+    turn_off_timer.start();
+
+    let mut debug_timer = Timer::new(Duration::from_millis(200), true);
+    debug_timer.start();
+
     loop {
         document.update_input();
-        document.update();
-        let canvas = document.draw();
-        canvas.draw(&mut display).unwrap();
-        display.flush().unwrap();
 
-        if --loops == 0 {
+        // if debug_timer.run() {
+        //     log::info!(
+        //         "Pin 15 {:?}, pin 32 {:?}, pin 14 {:?}",
+        //         pin_driver_15.get_level(),
+        //         pin_driver_32.get_level(),
+        //         pin_driver_14.get_level()
+        //     );
+        // }
+
+        if update_timer.run() {
+            document.update();
+        }
+
+        if draw_timer.run() {
+            let canvas = document.draw();
+            canvas.draw(&mut display).unwrap();
+            display.flush().unwrap();
+        }
+
+        if turn_off_timer.run() {
             break;
         }
 
         // Sleeping here to make sure the watchdog isn't triggered
-        FreeRtos::delay_ms(50); // 20 fps
+        // There is probably a better way to do this
+        FreeRtos::delay_ms(1);
     }
 
     log::info!("Test draw finished");
