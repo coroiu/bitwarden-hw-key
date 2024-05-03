@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::gui::{
     document::node::{ElementState, Node},
@@ -147,7 +147,7 @@ impl Styles {
 }
 
 impl ElementStyles {
-    pub(crate) fn applicable_styles(&self, states: &Vec<ElementState>) -> Styles {
+    pub(crate) fn applicable_styles(&self, states: &HashSet<ElementState>) -> Styles {
         let mut applicable_styles = Styles::default();
         for state in states {
             if let Some(styles) = self.state_styles.get(state) {

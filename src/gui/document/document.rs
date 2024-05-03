@@ -8,7 +8,10 @@ use crate::gui::{
     },
 };
 
-use super::node::{Attributes, Node, NodeType};
+use super::{
+    node::{Attributes, ElementState, Node, NodeType},
+    utils::SequenceGenerator,
+};
 
 pub struct Document {
     pub(super) root: Node,
@@ -51,6 +54,11 @@ impl Document {
         &mut self.root.children
     }
 
+    pub fn update(&mut self) {
+        self.assign_tab_index();
+        self.assign_states();
+    }
+
     pub fn draw(&self) -> Canvas {
         let bounds = Rectangle::new(0, 0, self.width, self.height);
 
@@ -58,5 +66,45 @@ impl Document {
         let mut layout_root = build_layout_tree(&style_root);
         layout_root.layout(bounds);
         draw(&layout_root, bounds)
+    }
+
+    fn assign_tab_index(&mut self) {
+        let mut sequence = SequenceGenerator::new();
+        self.root.traverse_mut(&mut |node| {
+            if let Some(tab_index) = node
+                .node_data
+                .attributes
+                .tab_index
+                .and_then(|i| i.try_into().ok())
+            {
+                sequence.reserve(tab_index);
+            }
+        });
+
+        self.root.traverse_mut(&mut |node| {
+            match node.node_data.attributes.tab_index {
+                Some(tab_index) if tab_index >= 0 => {
+                    node.node_data.properties.tab_index = Some(tab_index as u32)
+                }
+                Some(_) => {
+                    node.node_data.properties.tab_index = None;
+                }
+                None => {
+                    node.node_data.properties.tab_index = Some(sequence.next());
+                }
+            };
+        });
+    }
+
+    fn assign_states(&mut self) {
+        self.root
+            .traverse_mut(&mut |node| match node.node_data.properties.tab_index {
+                Some(tab_index) if tab_index == self.tab_index => {
+                    node.states.insert(ElementState::Focus);
+                }
+                _ => {
+                    node.states.remove(&ElementState::Focus);
+                }
+            });
     }
 }

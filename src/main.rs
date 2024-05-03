@@ -76,8 +76,9 @@ fn main() -> Result<(), EspError> {
      *   SETUP VIEWS   *
      *******************/
 
-    let view = create_view(128, 32);
-    let canvas = view.draw();
+    let mut document = create_view(128, 32);
+    document.update();
+    let canvas = document.draw();
     canvas.draw(&mut display).unwrap();
     display.flush().unwrap();
 

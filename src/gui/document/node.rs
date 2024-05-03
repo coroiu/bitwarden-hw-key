@@ -1,10 +1,12 @@
+use std::collections::HashSet;
+
 use crate::gui::style::{font::Font, styles::ElementStyles};
 
 pub struct Node {
     pub children: Vec<Node>,
     pub node_data: GenericNodeData,
     pub node_type: NodeType,
-    pub states: Vec<ElementState>,
+    pub states: HashSet<ElementState>,
     // Sort of like an angular component, needs some method of refering to the node
     // pub custom_component: Option<Box<dyn CustomComponent>>,
 }
@@ -25,10 +27,21 @@ pub enum ElementState {
 pub struct Attributes {
     pub id: Option<String>,
     pub style: Option<ElementStyles>,
+    /// None = Automatically assigned by the DOM
+    /// Some(-1) = Not focusable
+    /// Some(>=0) = Manually assigned
+    pub tab_index: Option<i32>,
+}
+
+/// These are assigned by the DOM and are not user defined
+#[derive(Default)]
+pub struct Properties {
+    pub tab_index: Option<u32>,
 }
 
 pub struct GenericNodeData {
     pub attributes: Attributes,
+    pub properties: Properties,
 }
 
 pub enum NodeType {
@@ -45,9 +58,19 @@ impl Node {
     pub fn new(node_type: NodeType, attributes: Attributes) -> Self {
         Node {
             children: Vec::new(),
-            states: Vec::new(),
-            node_data: GenericNodeData { attributes },
+            states: HashSet::new(),
+            node_data: GenericNodeData {
+                attributes,
+                properties: Default::default(),
+            },
             node_type,
+        }
+    }
+
+    pub fn traverse_mut(&mut self, f: &mut dyn FnMut(&mut Node)) {
+        f(self);
+        for child in &mut self.children {
+            child.traverse_mut(f);
         }
     }
 }
