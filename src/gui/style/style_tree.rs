@@ -15,6 +15,7 @@ pub fn build_style_tree<'a>(
         .unwrap_or_default();
 
     let style = element_styles.applicable_styles(&root.states);
+    // let style = element_styles.base_styles;
 
     StyledNode {
         node: root,

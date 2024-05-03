@@ -5,7 +5,7 @@ use crate::gui::{
     primitives::Color,
 };
 
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Styles {
     pub display: Display,
     pub color: Option<Color>,
@@ -25,7 +25,7 @@ pub struct ElementStyles {
     pub state_styles: HashMap<ElementState, Styles>,
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub enum Display {
     #[default]
     Flex,
@@ -63,7 +63,7 @@ impl From<i32> for Size {
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct EdgeSizes {
     pub top: Option<Size>,
     pub right: Option<Size>,
@@ -148,7 +148,7 @@ impl Styles {
 
 impl ElementStyles {
     pub(crate) fn applicable_styles(&self, states: &HashSet<ElementState>) -> Styles {
-        let mut applicable_styles = Styles::default();
+        let mut applicable_styles = self.base_styles.clone();
         for state in states {
             if let Some(styles) = self.state_styles.get(state) {
                 applicable_styles = applicable_styles.merge_with(styles);
