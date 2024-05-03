@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use embedded_graphics::{pixelcolor::BinaryColor, Drawable};
 
 use crate::gui::{
     document::{
-        node::{Attributes, Node, NodeType, TextNodeData},
+        node::{Attributes, ElementState, Node, NodeType, TextNodeData},
         Document,
     },
     input::InputInterface,
@@ -20,38 +22,7 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
     document.children_mut().push(Node::new(
         NodeType::Box(),
         Attributes {
-            style: ElementStyles {
-                base_styles: Styles {
-                    display: Display::Flex,
-                    background_color: Color::white().into(),
-                    width: 30.px().into(),
-                    height: Size::Auto.into(),
-                    ..Default::default()
-                },
-                state_styles: Default::default(),
-            }
-            .into(),
-            ..Default::default()
-        },
-    ));
-
-    // document.children_mut().push(Node::new(
-    //     NodeType::Box(),
-    //     Attributes {
-    //         style: Some(Styles {
-    //             display: Display::Flex,
-    //             background_color: Color::black().into(),
-    //             width: Size::Pixels(30).into(),
-    //             height: Size::Pixels(20).into(),
-    //             ..Default::default()
-    //         }),
-    //         ..Default::default()
-    //     },
-    // ));
-
-    document.children_mut().push(Node::new(
-        NodeType::Box(),
-        Attributes {
+            tab_index: Some(0),
             style: ElementStyles {
                 base_styles: Styles {
                     display: Display::Flex,
@@ -59,12 +30,48 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
                     border_color: Color::white().into(),
                     width: 30.px().into(),
                     height: Size::Auto.into(),
-                    border: EdgeSizes::all(1.px()).into(),
                     padding: EdgeSizes::all(1.px()).into(),
                     margin: EdgeSizes::all(1.px()).into(),
                     ..Default::default()
                 },
-                state_styles: Default::default(),
+                state_styles: HashMap::from_iter(vec![(
+                    ElementState::Focus,
+                    Styles {
+                        height: 10.px().into(),
+                        border: EdgeSizes::all(1.px()).into(),
+                        ..Default::default()
+                    },
+                )]),
+            }
+            .into(),
+            ..Default::default()
+        },
+    ));
+
+    document.children_mut().push(Node::new(
+        NodeType::Box(),
+        Attributes {
+            tab_index: Some(1),
+            style: ElementStyles {
+                base_styles: Styles {
+                    display: Display::Flex,
+                    background_color: Color::white().into(),
+                    border_color: Color::white().into(),
+                    width: 30.px().into(),
+                    height: Size::Auto.into(),
+                    // border: EdgeSizes::all(1.px()).into(),
+                    padding: EdgeSizes::all(1.px()).into(),
+                    margin: EdgeSizes::all(1.px()).into(),
+                    ..Default::default()
+                },
+                state_styles: HashMap::from_iter(vec![(
+                    ElementState::Focus,
+                    Styles {
+                        height: 10.px().into(),
+                        border: EdgeSizes::all(1.px()).into(),
+                        ..Default::default()
+                    },
+                )]),
             }
             .into(),
             ..Default::default()

@@ -21,6 +21,8 @@ impl SequenceGenerator {
         while self.reserved.contains(&self.current) {
             self.current += 1;
         }
-        self.current
+        let next = self.current;
+        self.current += 1;
+        next
     }
 }

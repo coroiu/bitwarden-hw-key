@@ -1,5 +1,5 @@
 use crate::gui::{
-    input::InputInterface,
+    input::{InputEvent, InputInterface, KeyCode, KeyEvent},
     layout::layout_tree::build_layout_tree,
     primitives::{Color, Rectangle},
     render::{draw, Canvas},
@@ -80,13 +80,25 @@ impl Document {
     fn handle_input(&mut self) {
         let events = self.input.get_events();
         for event in events {
-            log::info!("Event: {:?}", event);
-            // match event.key_event {
-            //     KeyEvent::Clicked => {
-            //         self.tab_index = (self.tab_index + 1) % 3;
-            //     }
-            //     _ => {}
-            // }
+            match event {
+                InputEvent {
+                    key_code: KeyCode::Up,
+                    key_event: KeyEvent::Clicked,
+                } => {
+                    self.tab_index = (self.tab_index - 1).max(0);
+                }
+
+                InputEvent {
+                    key_code: KeyCode::Down,
+                    key_event: KeyEvent::Clicked,
+                } => {
+                    self.tab_index += 1;
+                }
+
+                _ => {}
+            }
+
+            log::info!("Event: {:?}, tab_index: {:?}", event, self.tab_index);
         }
     }
 
