@@ -1,4 +1,9 @@
-use crate::gui::primitives::Color;
+use std::collections::HashMap;
+
+use crate::gui::{
+    document::node::{ElementState, Node},
+    primitives::Color,
+};
 
 #[derive(Default, Clone)]
 pub struct Styles {
@@ -12,6 +17,12 @@ pub struct Styles {
     pub padding: Option<EdgeSizes>,
     pub border: Option<EdgeSizes>,
     pub flex_direction: Option<FlexDirection>,
+}
+
+#[derive(Default, Clone)]
+pub struct ElementStyles {
+    pub base_styles: Styles,
+    pub state_styles: HashMap<ElementState, Styles>,
 }
 
 #[derive(Default, Clone, Copy)]
@@ -114,5 +125,35 @@ pub trait SizeFluentPercentage {
 impl SizeFluentPercentage for f32 {
     fn percent(self) -> Size {
         Size::Percentage(self)
+    }
+}
+
+impl Styles {
+    /// Combine two styles into one. If a rule exists in both then `other` will be prioritized
+    pub(crate) fn merge_with(&self, other: &Styles) -> Styles {
+        Styles {
+            display: other.display,
+            color: other.color.or(self.color),
+            background_color: other.background_color.or(self.background_color),
+            border_color: other.border_color.or(self.border_color),
+            width: other.width.or(self.width),
+            height: other.height.or(self.height),
+            margin: other.margin.or(self.margin),
+            padding: other.padding.or(self.padding),
+            border: other.border.or(self.border),
+            flex_direction: other.flex_direction.or(self.flex_direction),
+        }
+    }
+}
+
+impl ElementStyles {
+    pub(crate) fn applicable_styles(&self, states: &Vec<ElementState>) -> Styles {
+        let mut applicable_styles = Styles::default();
+        for state in states {
+            if let Some(styles) = self.state_styles.get(state) {
+                applicable_styles = applicable_styles.merge_with(styles);
+            }
+        }
+        applicable_styles
     }
 }

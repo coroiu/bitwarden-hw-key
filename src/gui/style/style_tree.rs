@@ -1,9 +1,12 @@
-use crate::gui::document::node::Node;
+use crate::gui::document::{node::Node, Document};
 
 use super::styled_node::StyledNode;
 
-pub fn build_style_tree<'a>(root: &'a Node /*, stylesheet: &Stylesheet */) -> StyledNode<'a> {
-    let style = root
+pub fn build_style_tree<'a>(
+    document: &Document,
+    root: &'a Node, /*, stylesheet: &Stylesheet */
+) -> StyledNode<'a> {
+    let element_styles = root
         .node_data
         .attributes
         .style
@@ -11,13 +14,15 @@ pub fn build_style_tree<'a>(root: &'a Node /*, stylesheet: &Stylesheet */) -> St
         .cloned()
         .unwrap_or_default();
 
+    let style = element_styles.applicable_styles(&root.states);
+
     StyledNode {
         node: root,
         style,
         children: root
             .children
             .iter()
-            .map(|child| build_style_tree(child))
+            .map(|child| build_style_tree(document, child))
             .collect(),
     }
 }
