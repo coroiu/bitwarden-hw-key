@@ -73,4 +73,8 @@ impl Node {
             child.traverse_mut(f);
         }
     }
+
+    pub fn children_mut(&mut self) -> &mut Vec<Node> {
+        &mut self.children
+    }
 }

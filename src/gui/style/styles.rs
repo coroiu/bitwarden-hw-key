@@ -128,6 +128,12 @@ impl SizeFluentPercentage for f32 {
     }
 }
 
+impl SizeFluentPercentage for i32 {
+    fn percent(self) -> Size {
+        Size::Percentage(self as f32)
+    }
+}
+
 impl Styles {
     /// Combine two styles into one. If a rule exists in both then `other` will be prioritized
     pub(crate) fn merge_with(&self, other: &Styles) -> Styles {
