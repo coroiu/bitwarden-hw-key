@@ -121,6 +121,10 @@ fn main() -> Result<(), EspError> {
     let mut debug_timer = Timer::new(Duration::from_millis(200), true);
     debug_timer.start();
 
+    // let canvas: gui::render::Canvas = document.draw();
+    // canvas.draw(&mut display).unwrap();
+    // display.flush().unwrap();
+
     loop {
         document.update_input();
 
@@ -138,7 +142,7 @@ fn main() -> Result<(), EspError> {
         }
 
         if draw_timer.run() {
-            let canvas = document.draw();
+            let canvas: gui::render::Canvas = document.draw();
             canvas.draw(&mut display).unwrap();
             display.flush().unwrap();
         }

@@ -1,8 +1,8 @@
 use crate::gui::{
     primitives::{Edges, Rectangle},
     style::{
-        styled_node::StyledNode,
-        styles::{FlexDirection, Size},
+        styled_node::{self, StyledNode},
+        styles::{FlexDirection, Size, Styles},
     },
 };
 
@@ -87,7 +87,7 @@ impl<'a> LayoutBox<'a> {
     }
 
     pub(crate) fn layout(&mut self, bounds: Rectangle) {
-        let containing_block = match self.box_type {
+        let containing_dimensions = match self.box_type {
             BoxType::FlexNode(styled_node) => {
                 match styled_node.style.flex_direction.unwrap_or_default() {
                     FlexDirection::Row => Dimensions {
@@ -116,30 +116,46 @@ impl<'a> LayoutBox<'a> {
             },
         };
 
-        self.layout_as_child(&containing_block);
+        self.layout_as_child(&containing_dimensions, &self.box_type.clone());
     }
 
-    fn layout_as_child(&mut self, containing_block: &Dimensions) {
-        match self.box_type {
-            BoxType::FlexNode(styled_node) => self.layout_flex(styled_node, containing_block),
+    fn layout_as_child(&mut self, containing_dimensions: &Dimensions, containing_type: &BoxType) {
+        match containing_type {
+            BoxType::FlexNode(containing_styles) => match &self.box_type {
+                BoxType::FlexNode(styled_node) => {
+                    self.layout_flex(styled_node, containing_dimensions, &containing_styles.style)
+                }
+                BoxType::InlineNode(_) => {}
+                BoxType::AnonymousBlock => {}
+            },
             BoxType::InlineNode(_) => {}
             BoxType::AnonymousBlock => {}
         }
     }
 
-    fn layout_flex(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {
-        self.calculate_flex_height(styled_node, containing_block);
-        self.calculate_flex_width(styled_node, containing_block);
-        // self.layout_flex_children(styled_node, containing_block);
+    fn layout_flex(
+        &mut self,
+        styled_node: &StyledNode,
+        containing_dimensions: &Dimensions,
+        containing_styles: &Styles,
+    ) {
+        self.calculate_flex_height(styled_node, containing_dimensions, containing_styles);
+        self.calculate_flex_width(styled_node, containing_dimensions, containing_styles);
+        // self.layout_flex_children(styled_node, containing_dimensions);
     }
 
-    fn calculate_flex_width(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {
-        match styled_node.style.flex_direction.unwrap_or_default() {
+    fn calculate_flex_width(
+        &mut self,
+        styled_node: &StyledNode,
+        containing_dimensions: &Dimensions,
+        containing_styles: &Styles,
+    ) {
+        match containing_styles.flex_direction.unwrap_or_default() {
             FlexDirection::Row => {
                 let style = &styled_node.style;
 
                 // // We don't expect the content width to be so big that we overflow an i32
-                let containing_width = containing_block.content.width.try_into().unwrap();
+                let containing_width = containing_dimensions.content.width.try_into().unwrap();
                 let d = &mut self.dimensions;
 
                 // margins, borders, and paddings default to 0
@@ -162,14 +178,14 @@ impl<'a> LayoutBox<'a> {
                 d.margin.right = margin_right.to_pixels(containing_width);
 
                 // Position the box to the left of all the previous boxes in the container.
-                d.content.x = containing_block.content.width as i32
-                    + containing_block.content.x
+                d.content.x = containing_dimensions.content.width as i32
+                    + containing_dimensions.content.x
                     + d.margin.left
                     + d.border.left
                     + d.padding.left;
 
                 for child in &mut self.children {
-                    child.layout_as_child(d);
+                    child.layout_as_child(d, &self.box_type);
                     // Track the height so each child is laid out next to the previous node.
                     d.content.width = d.content.width + child.dimensions.margin_box().width;
                 }
@@ -190,12 +206,17 @@ impl<'a> LayoutBox<'a> {
         }
     }
 
-    fn calculate_flex_height(&mut self, styled_node: &StyledNode, containing_block: &Dimensions) {
+    fn calculate_flex_height(
+        &mut self,
+        styled_node: &StyledNode,
+        containing_dimensions: &Dimensions,
+        containing_styles: &Styles,
+    ) {
         // Assume flex-direction: row;
         let style = &styled_node.style;
 
         // We don't expect the content width to be so big that we overflow an i32
-        let containing_height = containing_block.content.height.try_into().unwrap();
+        let containing_height = containing_dimensions.content.height.try_into().unwrap();
 
         // width defaults to auto
         let mut height = style.height.unwrap_or(Size::Auto);
@@ -246,6 +267,6 @@ impl<'a> LayoutBox<'a> {
         d.margin.top = margin_top.to_pixels(containing_height);
         d.margin.bottom = margin_bottom.to_pixels(containing_height);
 
-        d.content.y = containing_block.content.y + d.margin.top + d.border.top + d.padding.top;
+        d.content.y = containing_dimensions.content.y + d.margin.top + d.border.top + d.padding.top;
     }
 }
