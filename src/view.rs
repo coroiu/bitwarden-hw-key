@@ -44,7 +44,28 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
         },
     );
 
-    container.children_mut().push(Node::new(
+    let mut container_a = Node::new(
+        NodeType::Box(),
+        Attributes {
+            style: ElementStyles {
+                base_styles: Styles {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column.into(),
+                    border_color: Color::white().into(),
+                    width: 50.percent().into(),
+                    height: 100.percent().into(),
+                    margin: EdgeSizes::all(1.px()).into(),
+                    border: EdgeSizes::all(1.px()).into(),
+                    ..Default::default()
+                },
+                state_styles: Default::default(),
+            }
+            .into(),
+            ..Default::default()
+        },
+    );
+
+    container_a.children_mut().push(Node::new(
         NodeType::Box(),
         Attributes {
             style: ElementStyles {
@@ -52,8 +73,8 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
                     display: Display::Flex,
                     flex_direction: FlexDirection::Row.into(),
                     border_color: Color::white().into(),
-                    width: 33.percent().into(),
-                    height: Size::Auto.into(),
+                    width: Size::Auto.into(),
+                    height: 33.percent().into(),
                     padding: EdgeSizes::all(1.px()).into(),
                     margin: EdgeSizes::all(1.px()).into(),
                     border: EdgeSizes::all(1.px()).into(),
@@ -65,6 +86,52 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
             ..Default::default()
         },
     ));
+
+    container_a.children_mut().push(Node::new(
+        NodeType::Box(),
+        Attributes {
+            style: ElementStyles {
+                base_styles: Styles {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Row.into(),
+                    border_color: Color::white().into(),
+                    width: 100.percent().into(),
+                    height: 33.percent().into(),
+                    padding: EdgeSizes::all(1.px()).into(),
+                    margin: EdgeSizes::all(1.px()).into(),
+                    border: EdgeSizes::all(1.px()).into(),
+                    ..Default::default()
+                },
+                state_styles: Default::default(),
+            }
+            .into(),
+            ..Default::default()
+        },
+    ));
+
+    container_a.children_mut().push(Node::new(
+        NodeType::Box(),
+        Attributes {
+            style: ElementStyles {
+                base_styles: Styles {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Row.into(),
+                    border_color: Color::white().into(),
+                    width: 50.percent().into(),
+                    height: 33.percent().into(),
+                    padding: EdgeSizes::all(1.px()).into(),
+                    margin: EdgeSizes::all(1.px()).into(),
+                    border: EdgeSizes::all(1.px()).into(),
+                    ..Default::default()
+                },
+                state_styles: Default::default(),
+            }
+            .into(),
+            ..Default::default()
+        },
+    ));
+
+    container.children_mut().push(container_a);
 
     container.children_mut().push(Node::new(
         NodeType::Box(),
@@ -97,7 +164,7 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
                     flex_direction: FlexDirection::Row.into(),
                     border_color: Color::white().into(),
                     width: 33.percent().into(),
-                    height: 50.percent().into(),
+                    height: 33.percent().into(),
                     padding: EdgeSizes::all(1.px()).into(),
                     margin: EdgeSizes::all(1.px()).into(),
                     border: EdgeSizes::all(1.px()).into(),
