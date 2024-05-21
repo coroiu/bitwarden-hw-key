@@ -156,18 +156,15 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
     ));
 
     container.children_mut().push(Node::new(
-        NodeType::Box(),
+        NodeType::Text(TextNodeData {
+            text: "Hello, world".to_string(),
+            font: &FONT_5X8,
+        }),
         Attributes {
             style: ElementStyles {
                 base_styles: Styles {
                     display: Display::Flex,
-                    flex_direction: FlexDirection::Row.into(),
-                    border_color: Color::white().into(),
                     width: 33.percent().into(),
-                    height: 33.percent().into(),
-                    padding: EdgeSizes::all(1.px()).into(),
-                    margin: EdgeSizes::all(1.px()).into(),
-                    border: EdgeSizes::all(1.px()).into(),
                     ..Default::default()
                 },
                 state_styles: Default::default(),
@@ -176,107 +173,6 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
             ..Default::default()
         },
     ));
-
-    // let mut row_node = Node::new(
-    //     NodeType::Box(),
-    //     Attributes {
-    //         style: ElementStyles {
-    //             base_styles: Styles {
-    //                 display: Display::Flex,
-    //                 flex_direction: FlexDirection::Column.into(),
-    //                 border_color: Color::white().into(),
-    //                 // width: 100.percent().into(), // Fix so this is possible
-    //                 width: 122.px().into(),
-    //                 height: Size::Auto.into(),
-    //                 padding: EdgeSizes::all(1.px()).into(),
-    //                 margin: EdgeSizes::all(1.px()).into(),
-    //                 border: EdgeSizes::all(1.px()).into(),
-    //                 ..Default::default()
-    //             },
-    //             state_styles: Default::default(),
-    //         }
-    //         .into(),
-    //         ..Default::default()
-    //     },
-    // );
-
-    // row_node.children_mut().push(Node::new(
-    //     NodeType::Box(),
-    //     Attributes {
-    //         tab_index: Some(0),
-    //         style: ElementStyles {
-    //             base_styles: Styles {
-    //                 display: Display::Flex,
-    //                 background_color: Color::white().into(),
-    //                 border_color: Color::white().into(),
-    //                 width: Size::Auto.into(),
-    //                 height: 10.px().into(),
-    //                 padding: EdgeSizes::all(1.px()).into(),
-    //                 margin: EdgeSizes::all(1.px()).into(),
-    //                 ..Default::default()
-    //             },
-    //             state_styles: HashMap::from_iter(vec![(
-    //                 ElementState::Focus,
-    //                 Styles {
-    //                     width: 10.px().into(),
-    //                     border: EdgeSizes::all(1.px()).into(),
-    //                     ..Default::default()
-    //                 },
-    //             )]),
-    //         }
-    //         .into(),
-    //         ..Default::default()
-    //     },
-    // ));
-
-    // row_node.children_mut().push(Node::new(
-    //     NodeType::Box(),
-    //     Attributes {
-    //         tab_index: Some(1),
-    //         style: ElementStyles {
-    //             base_styles: Styles {
-    //                 display: Display::Flex,
-    //                 background_color: Color::white().into(),
-    //                 border_color: Color::white().into(),
-    //                 width: Size::Auto.into(),
-    //                 height: 10.px().into(),
-    //                 // border: EdgeSizes::all(1.px()).into(),
-    //                 padding: EdgeSizes::all(1.px()).into(),
-    //                 margin: EdgeSizes::all(1.px()).into(),
-    //                 ..Default::default()
-    //             },
-    //             state_styles: HashMap::from_iter(vec![(
-    //                 ElementState::Focus,
-    //                 Styles {
-    //                     width: 10.px().into(),
-    //                     border: EdgeSizes::all(1.px()).into(),
-    //                     ..Default::default()
-    //                 },
-    //             )]),
-    //         }
-    //         .into(),
-    //         ..Default::default()
-    //     },
-    // ));
-
-    // row_node.children_mut().push(Node::new(
-    //     NodeType::Text(TextNodeData {
-    //         text: "Hello, world".to_string(),
-    //         font: &FONT_5X8,
-    //     }),
-    //     Attributes {
-    //         style: ElementStyles {
-    //             base_styles: Styles {
-    //                 display: Display::Flex,
-    //                 width: 67.px().into(),
-    //                 ..Default::default()
-    //             },
-    //             state_styles: Default::default(),
-    //         }
-    //         .into(),
-    //         ..Default::default()
-    //     },
-    // ));
 
     document.children_mut().push(container);
 

@@ -146,8 +146,6 @@ impl<'a> LayoutBox<'a> {
             containing_styles,
             offset,
         );
-
-        println!("{:?}", self.dimensions);
     }
 
     fn calculate_flex_width(
