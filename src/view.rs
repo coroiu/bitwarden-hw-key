@@ -22,7 +22,29 @@ use crate::gui::{
 pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> Document {
     let mut document = Document::new(width, height, input);
 
-    document.children_mut().push(Node::new(
+    let mut container = Node::new(
+        NodeType::Box(),
+        Attributes {
+            style: ElementStyles {
+                base_styles: Styles {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Row.into(),
+                    border_color: Color::white().into(),
+                    width: 100.percent().into(),
+                    height: 100.percent().into(),
+                    padding: EdgeSizes::all(1.px()).into(),
+                    margin: EdgeSizes::all(1.px()).into(),
+                    border: EdgeSizes::all(1.px()).into(),
+                    ..Default::default()
+                },
+                state_styles: Default::default(),
+            }
+            .into(),
+            ..Default::default()
+        },
+    );
+
+    container.children_mut().push(Node::new(
         NodeType::Box(),
         Attributes {
             style: ElementStyles {
@@ -44,7 +66,7 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
         },
     ));
 
-    document.children_mut().push(Node::new(
+    container.children_mut().push(Node::new(
         NodeType::Box(),
         Attributes {
             style: ElementStyles {
@@ -66,7 +88,7 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
         },
     ));
 
-    document.children_mut().push(Node::new(
+    container.children_mut().push(Node::new(
         NodeType::Box(),
         Attributes {
             style: ElementStyles {
@@ -189,7 +211,7 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
     //     },
     // ));
 
-    // document.children_mut().push(row_node);
+    document.children_mut().push(container);
 
     document
 }

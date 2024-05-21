@@ -157,36 +157,42 @@ impl<'a> LayoutBox<'a> {
         containing_styles: &Styles,
         offset: Point,
     ) {
-        match containing_styles.flex_direction.unwrap_or_default() {
-            FlexDirection::Row => {
-                self.calculate_flex_height(
-                    styled_node,
-                    containing_dimensions,
-                    containing_styles,
-                    offset,
-                );
-                self.calculate_flex_width(
-                    styled_node,
-                    containing_dimensions,
-                    containing_styles,
-                    offset,
-                );
-            }
-            FlexDirection::Column => {
-                self.calculate_flex_width(
-                    styled_node,
-                    containing_dimensions,
-                    containing_styles,
-                    offset,
-                );
-                self.calculate_flex_height(
-                    styled_node,
-                    containing_dimensions,
-                    containing_styles,
-                    offset,
-                );
-            }
-        };
+        // match containing_styles.flex_direction.unwrap_or_default() {
+        //     FlexDirection::Row => {
+        //         self.calculate_flex_height(
+        //             styled_node,
+        //             containing_dimensions,
+        //             containing_styles,
+        //             offset,
+        //         );
+        //         self.calculate_flex_width(
+        //             styled_node,
+        //             containing_dimensions,
+        //             containing_styles,
+        //             offset,
+        //         );
+        //     }
+        //     FlexDirection::Column => {
+        self.calculate_flex_width(
+            styled_node,
+            containing_dimensions,
+            containing_styles,
+            offset,
+        );
+        self.calculate_flex_height(
+            styled_node,
+            containing_dimensions,
+            containing_styles,
+            offset,
+        );
+        self.layout_flex_children(
+            styled_node,
+            containing_dimensions,
+            containing_styles,
+            offset,
+        );
+        //     }
+        // };
 
         println!("{:?}", self.dimensions);
     }
@@ -241,19 +247,6 @@ impl<'a> LayoutBox<'a> {
                             - d.padding.right as u32;
                     }
                     _ => {} // width is auto, it will be calculated below (not currently supported)
-                }
-
-                // let child_container = d.padding_box()
-                let mut x_position = d.content.x;
-                for child in &mut self.children {
-                    child.layout_as_child(d, &self.box_type, offset.translate(x_position, 0));
-                    // Track the x offset so each child is laid out next to the previous node.
-                    x_position = x_position + child.dimensions.margin_box().width as i32;
-
-                    if matches!(width, Size::Auto) {
-                        // Not tested
-                        d.content.width = d.content.width + child.dimensions.margin_box().width;
-                    }
                 }
             }
             FlexDirection::Column => {
@@ -428,6 +421,40 @@ impl<'a> LayoutBox<'a> {
                     _ => {} // height is auto, we have already calculated this using the children
                 }
             }
+        }
+    }
+
+    fn layout_flex_children(
+        &mut self,
+        styled_node: &StyledNode,
+        _containing_dimensions: &Dimensions,
+        containing_styles: &Styles,
+        offset: Point,
+    ) {
+        let d = &mut self.dimensions;
+        let style = &styled_node.style;
+
+        match containing_styles.flex_direction.unwrap_or_default() {
+            FlexDirection::Row => {
+                let width = style.width.unwrap_or_default();
+                let y_position = d.content.y;
+                let mut x_position = d.content.x;
+                for child in &mut self.children {
+                    child.layout_as_child(
+                        d,
+                        &self.box_type,
+                        offset.translate(x_position, y_position),
+                    );
+                    // Track the x offset so each child is laid out next to the previous node.
+                    x_position = x_position + child.dimensions.margin_box().width as i32;
+
+                    if matches!(width, Size::Auto) {
+                        // Not tested
+                        d.content.width = d.content.width + child.dimensions.margin_box().width;
+                    }
+                }
+            }
+            FlexDirection::Column => {}
         }
     }
 }
