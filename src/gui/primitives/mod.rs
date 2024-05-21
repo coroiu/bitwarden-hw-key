@@ -46,6 +46,13 @@ impl Rectangle {
         }
     }
 
+    pub fn top_left(&self) -> Point {
+        Point {
+            x: self.x,
+            y: self.y,
+        }
+    }
+
     pub fn expand(&self, edges: &Edges) -> Rectangle {
         Rectangle {
             x: self.x - edges.left,
@@ -107,5 +114,12 @@ impl Point {
 
     pub fn zero() -> Point {
         Point { x: 0, y: 0 }
+    }
+
+    pub fn translate(&self, x: i32, y: i32) -> Point {
+        Point {
+            x: self.x + x,
+            y: self.y + y,
+        }
     }
 }
