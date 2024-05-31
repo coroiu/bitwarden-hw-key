@@ -85,7 +85,7 @@ impl Document {
                     key_code: KeyCode::Up,
                     key_event: KeyEvent::Clicked,
                 } => {
-                    self.tab_index = (self.tab_index - 1).max(0);
+                    self.tab_index = (self.tab_index as i32 - 1 as i32).max(0 as i32) as u32;
                 }
 
                 InputEvent {
