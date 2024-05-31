@@ -1,7 +1,7 @@
 use crate::gui::{
     primitives::{Edges, Point, Rectangle},
     style::{
-        styled_node::{self, StyledNode},
+        styled_node::StyledNode,
         styles::{FlexDirection, Size, Styles},
     },
 };
@@ -376,30 +376,18 @@ impl<'a> LayoutBox<'a> {
         let d = &mut self.dimensions;
         let style = &styled_node.style;
 
-        match style.flex_direction.unwrap_or_default() {
-            FlexDirection::Row => {
-                let y_position = d.content.y;
-                let mut x_position = d.content.x;
-                for child in &mut self.children {
-                    child.layout_as_child(
-                        d,
-                        &self.box_type,
-                        offset.translate(x_position, y_position),
-                    );
+        let mut y_position = d.content.y;
+        let mut x_position = d.content.x;
+
+        for child in &mut self.children {
+            child.layout_as_child(d, &self.box_type, offset.translate(x_position, y_position));
+
+            match style.flex_direction.unwrap_or_default() {
+                FlexDirection::Row => {
                     // Track the x offset so each child is laid out next to the previous node.z
                     x_position = x_position + child.dimensions.margin_box().width as i32;
                 }
-            }
-            FlexDirection::Column => {
-                let mut y_position = d.content.y;
-                let x_position = d.content.x;
-
-                for child in &mut self.children {
-                    child.layout_as_child(
-                        d,
-                        &self.box_type,
-                        offset.translate(x_position, y_position),
-                    );
+                FlexDirection::Column => {
                     // Track the y offset so each child is laid out next to the previous node.
                     y_position = y_position + child.dimensions.margin_box().height as i32;
                 }
