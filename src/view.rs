@@ -25,35 +25,15 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
     let mut container = Node::new(
         NodeType::Box(),
         Attributes {
-            style: ElementStyles {
-                base_styles: Styles {
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Row.into(),
-                    border_color: Color::white().into(),
-                    width: 100.percent().into(),
-                    height: 100.percent().into(),
-                    padding: EdgeSizes::all(1.px()).into(),
-                    margin: EdgeSizes::all(1.px()).into(),
-                    border: EdgeSizes::all(1.px()).into(),
-                    ..Default::default()
-                },
-                state_styles: Default::default(),
-            }
-            .into(),
-            ..Default::default()
-        },
-    );
-
-    let mut container_a = Node::new(
-        NodeType::Box(),
-        Attributes {
+            tab_index: Some(-1),
             style: ElementStyles {
                 base_styles: Styles {
                     display: Display::Flex,
                     flex_direction: FlexDirection::Column.into(),
                     border_color: Color::white().into(),
-                    width: 50.percent().into(),
+                    width: 100.percent().into(),
                     height: 100.percent().into(),
+                    padding: EdgeSizes::all(1.px()).into(),
                     margin: EdgeSizes::all(1.px()).into(),
                     border: EdgeSizes::all(1.px()).into(),
                     ..Default::default()
@@ -65,29 +45,7 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
         },
     );
 
-    container_a.children_mut().push(Node::new(
-        NodeType::Box(),
-        Attributes {
-            style: ElementStyles {
-                base_styles: Styles {
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Row.into(),
-                    border_color: Color::white().into(),
-                    width: Size::Auto.into(),
-                    height: 33.percent().into(),
-                    padding: EdgeSizes::all(1.px()).into(),
-                    margin: EdgeSizes::all(1.px()).into(),
-                    border: EdgeSizes::all(1.px()).into(),
-                    ..Default::default()
-                },
-                state_styles: Default::default(),
-            }
-            .into(),
-            ..Default::default()
-        },
-    ));
-
-    container_a.children_mut().push(Node::new(
+    container.children_mut().push(Node::new(
         NodeType::Box(),
         Attributes {
             style: ElementStyles {
@@ -96,42 +54,25 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
                     flex_direction: FlexDirection::Row.into(),
                     border_color: Color::white().into(),
                     width: 100.percent().into(),
-                    height: 33.percent().into(),
+                    height: 10.px().into(),
                     padding: EdgeSizes::all(1.px()).into(),
                     margin: EdgeSizes::all(1.px()).into(),
                     border: EdgeSizes::all(1.px()).into(),
                     ..Default::default()
                 },
-                state_styles: Default::default(),
+                state_styles: HashMap::from([(
+                    ElementState::Focus,
+                    Styles {
+                        margin: EdgeSizes::all(0.px()).into(),
+                        border: EdgeSizes::all(2.px()).into(),
+                        ..Default::default()
+                    },
+                )]),
             }
             .into(),
             ..Default::default()
         },
     ));
-
-    container_a.children_mut().push(Node::new(
-        NodeType::Box(),
-        Attributes {
-            style: ElementStyles {
-                base_styles: Styles {
-                    display: Display::Flex,
-                    flex_direction: FlexDirection::Row.into(),
-                    border_color: Color::white().into(),
-                    width: 50.percent().into(),
-                    height: 33.percent().into(),
-                    padding: EdgeSizes::all(1.px()).into(),
-                    margin: EdgeSizes::all(1.px()).into(),
-                    border: EdgeSizes::all(1.px()).into(),
-                    ..Default::default()
-                },
-                state_styles: Default::default(),
-            }
-            .into(),
-            ..Default::default()
-        },
-    ));
-
-    container.children_mut().push(container_a);
 
     container.children_mut().push(Node::new(
         NodeType::Box(),
@@ -141,14 +82,21 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
                     display: Display::Flex,
                     flex_direction: FlexDirection::Row.into(),
                     border_color: Color::white().into(),
-                    width: 33.percent().into(),
-                    height: 100.percent().into(),
+                    width: 100.percent().into(),
+                    height: 10.px().into(),
                     padding: EdgeSizes::all(1.px()).into(),
                     margin: EdgeSizes::all(1.px()).into(),
                     border: EdgeSizes::all(1.px()).into(),
                     ..Default::default()
                 },
-                state_styles: Default::default(),
+                state_styles: HashMap::from([(
+                    ElementState::Focus,
+                    Styles {
+                        margin: EdgeSizes::all(0.px()).into(),
+                        border: EdgeSizes::all(2.px()).into(),
+                        ..Default::default()
+                    },
+                )]),
             }
             .into(),
             ..Default::default()
@@ -156,23 +104,81 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
     ));
 
     container.children_mut().push(Node::new(
-        NodeType::Text(TextNodeData {
-            text: "Hello, world".to_string(),
-            font: &FONT_5X8,
-        }),
+        NodeType::Box(),
         Attributes {
             style: ElementStyles {
                 base_styles: Styles {
                     display: Display::Flex,
-                    width: 33.percent().into(),
+                    flex_direction: FlexDirection::Row.into(),
+                    border_color: Color::white().into(),
+                    width: 100.percent().into(),
+                    height: 10.px().into(),
+                    padding: EdgeSizes::all(1.px()).into(),
+                    margin: EdgeSizes::all(1.px()).into(),
+                    border: EdgeSizes::all(1.px()).into(),
                     ..Default::default()
                 },
-                state_styles: Default::default(),
+                state_styles: HashMap::from([(
+                    ElementState::Focus,
+                    Styles {
+                        margin: EdgeSizes::all(0.px()).into(),
+                        border: EdgeSizes::all(2.px()).into(),
+                        ..Default::default()
+                    },
+                )]),
             }
             .into(),
             ..Default::default()
         },
     ));
+
+    container.children_mut().push(Node::new(
+        NodeType::Box(),
+        Attributes {
+            style: ElementStyles {
+                base_styles: Styles {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Row.into(),
+                    border_color: Color::white().into(),
+                    width: 100.percent().into(),
+                    height: 10.px().into(),
+                    padding: EdgeSizes::all(1.px()).into(),
+                    margin: EdgeSizes::all(1.px()).into(),
+                    border: EdgeSizes::all(1.px()).into(),
+                    ..Default::default()
+                },
+                state_styles: HashMap::from([(
+                    ElementState::Focus,
+                    Styles {
+                        margin: EdgeSizes::all(0.px()).into(),
+                        border: EdgeSizes::all(2.px()).into(),
+                        ..Default::default()
+                    },
+                )]),
+            }
+            .into(),
+            ..Default::default()
+        },
+    ));
+
+    // container.children_mut().push(Node::new(
+    //     NodeType::Text(TextNodeData {
+    //         text: "Hello, world".to_string(),
+    //         font: &FONT_5X8,
+    //     }),
+    //     Attributes {
+    //         style: ElementStyles {
+    //             base_styles: Styles {
+    //                 display: Display::Flex,
+    //                 width: 33.percent().into(),
+    //                 ..Default::default()
+    //             },
+    //             state_styles: Default::default(),
+    //         }
+    //         .into(),
+    //         ..Default::default()
+    //     },
+    // ));
 
     document.children_mut().push(container);
 

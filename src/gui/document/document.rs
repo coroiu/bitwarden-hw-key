@@ -29,6 +29,7 @@ impl Document {
             root: Node::new(
                 NodeType::Box(),
                 Attributes {
+                    tab_index: Some(-1),
                     style: Some(ElementStyles {
                         base_styles: Styles {
                             display: Display::Flex,
