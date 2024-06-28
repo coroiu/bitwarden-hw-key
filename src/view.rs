@@ -161,6 +161,34 @@ pub fn create_view(width: u32, height: u32, input: Box<dyn InputInterface>) -> D
         },
     ));
 
+    container.children_mut().push(Node::new(
+        NodeType::Box(),
+        Attributes {
+            style: ElementStyles {
+                base_styles: Styles {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Row.into(),
+                    border_color: Color::white().into(),
+                    width: 100.percent().into(),
+                    height: 10.px().into(),
+                    padding: EdgeSizes::all(1.px()).into(),
+                    margin: EdgeSizes::all(1.px()).into(),
+                    border: EdgeSizes::all(1.px()).into(),
+                    ..Default::default()
+                },
+                state_styles: HashMap::from([(
+                    ElementState::Focus,
+                    Styles {
+                        margin: EdgeSizes::all(0.px()).into(),
+                        border: EdgeSizes::all(2.px()).into(),
+                        ..Default::default()
+                    },
+                )]),
+            }
+            .into(),
+            ..Default::default()
+        },
+    ));
     // container.children_mut().push(Node::new(
     //     NodeType::Text(TextNodeData {
     //         text: "Hello, world".to_string(),

@@ -64,12 +64,12 @@ impl Document {
     }
 
     pub fn update(&mut self) {
-        self.handle_input();
         self.assign_tab_index();
+        self.handle_input();
         self.assign_states();
     }
 
-    pub fn draw(&self) -> Canvas {
+    pub fn draw(&mut self) -> Canvas {
         let bounds = Rectangle::new(0, 0, self.width, self.height);
 
         let style_root = build_style_tree(self, &self.root);
@@ -87,6 +87,8 @@ impl Document {
                     key_event: KeyEvent::Clicked,
                 } => {
                     self.tab_index = (self.tab_index as i32 - 1 as i32).max(0 as i32) as u32;
+                    self.assign_states(); // TODO: Fix double calls to assign_states
+                    self.scroll_tabbed_into_view();
                 }
 
                 InputEvent {
@@ -94,6 +96,8 @@ impl Document {
                     key_event: KeyEvent::Clicked,
                 } => {
                     self.tab_index += 1;
+                    self.assign_states();
+                    self.scroll_tabbed_into_view();
                 }
 
                 _ => {}
@@ -141,5 +145,19 @@ impl Document {
                     node.states.remove(&ElementState::Focus);
                 }
             });
+    }
+
+    fn scroll_tabbed_into_view(&mut self) {
+        self.root.traverse_mut(&mut |node| {
+            if let Some(focused) = node
+                .children_mut()
+                .iter()
+                .find(|child| child.node_data.properties.tab_index == Some(self.tab_index))
+            {
+                let dimensions = focused.node_data.properties.dimensions.get();
+                println!("Scrolling into view: {:?}", dimensions);
+                node.scroll_into_view(dimensions);
+            }
+        });
     }
 }

@@ -28,7 +28,7 @@ pub struct Edges {
     pub left: i32,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Rectangle {
     pub x: i32,
     pub y: i32,
@@ -62,6 +62,14 @@ impl Rectangle {
         }
     }
 
+    pub fn offset(&self, point: Point) -> Rectangle {
+        Rectangle {
+            x: self.x + point.x,
+            y: self.y + point.y,
+            ..*self
+        }
+    }
+
     pub fn intersect(&self, b: Rectangle) -> Intersection {
         let x0 = self.x.max(b.x);
         let y0 = self.y.max(b.y);
@@ -89,7 +97,7 @@ impl Rectangle {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Intersection {
     /// The area of the intersection between two rectangles.
     pub bounds: Rectangle,
@@ -101,7 +109,13 @@ pub struct Intersection {
     pub offset_b: Point,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+impl Intersection {
+    pub fn is_zero(&self) -> bool {
+        self.bounds.width == 0 || self.bounds.height == 0
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Point {
     pub x: i32,
     pub y: i32,

@@ -119,6 +119,8 @@ impl<'a> LayoutBox<'a> {
             BoxType::InlineNode(_) => {}
             BoxType::AnonymousBlock => {}
         }
+
+        self.set_calculated_properties();
     }
 
     fn layout_flex(
@@ -376,8 +378,9 @@ impl<'a> LayoutBox<'a> {
         let d = &mut self.dimensions;
         let style = &styled_node.style;
 
-        let mut y_position = d.content.y;
-        let mut x_position = d.content.x;
+        let scroll = styled_node.node.node_data.properties.scroll.get();
+        let mut y_position = d.content.y - scroll.y;
+        let mut x_position = d.content.x - scroll.x;
 
         for child in &mut self.children {
             child.layout_as_child(d, &self.box_type, offset.translate(x_position, y_position));
@@ -392,6 +395,21 @@ impl<'a> LayoutBox<'a> {
                     y_position = y_position + child.dimensions.margin_box().height as i32;
                 }
             }
+        }
+    }
+
+    fn set_calculated_properties(&self) {
+        match &self.box_type {
+            BoxType::FlexNode(styled_node) => {
+                styled_node
+                    .node
+                    .node_data
+                    .properties
+                    .dimensions
+                    .set(self.dimensions.margin_box());
+            }
+            BoxType::InlineNode(_) => {}
+            BoxType::AnonymousBlock => {}
         }
     }
 }
