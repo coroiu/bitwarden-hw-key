@@ -4,6 +4,8 @@ pub mod components;
 mod controller;
 mod document;
 mod layout;
-mod primitives;
+pub mod primitives;
+mod render;
+mod style;
 
 pub use document::*;
