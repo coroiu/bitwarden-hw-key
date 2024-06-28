@@ -1,4 +1,8 @@
-use crate::simple_gui::{components::Component, primitives::Size};
+use crate::simple_gui::{
+    components::Component,
+    primitives::{Rectangle, Size},
+    render::RenderCommand,
+};
 
 pub trait View {}
 
@@ -32,8 +36,13 @@ impl StandaloneView {
         self.components_mut().iter_mut().for_each(|c| c.layout());
     }
 
-    pub(crate) fn draw(&self) {
-        self.components().iter().for_each(|c| c.draw());
+    pub(crate) fn draw(&self) -> Vec<RenderCommand> {
+        let mut commands = Vec::new();
+        let bounds = Rectangle::new(0, 0, self.size.width, self.size.height);
+        self.components()
+            .iter()
+            .for_each(|c| c.draw(bounds, &mut commands));
+        commands
     }
 }
 

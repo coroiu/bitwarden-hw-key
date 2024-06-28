@@ -1,4 +1,4 @@
-use super::{components::Component, layout::view::StandaloneView};
+use super::{components::Component, layout::view::StandaloneView, render::Canvas};
 
 pub struct Document {
     view: StandaloneView,
@@ -19,8 +19,10 @@ impl Document {
         self.view.layout();
     }
 
-    pub fn draw(&self) {
-        self.view.draw();
+    pub fn draw(&self, canvas: &mut Canvas) {
+        let commands = self.view.draw();
+
+        commands.iter().for_each(|c| canvas.execute(c));
     }
 
     #[allow(dead_code)]

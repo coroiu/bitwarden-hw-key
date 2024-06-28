@@ -21,6 +21,12 @@ impl ImageBuffer {
     pub(super) fn bounds(&self) -> Rectangle {
         Rectangle::new(0, 0, self.width as u32, self.height as u32)
     }
+
+    pub(super) fn clear(&mut self) {
+        for pixel in self.pixels.iter_mut() {
+            *pixel = Color::black();
+        }
+    }
 }
 
 impl Drawable for ImageBuffer {

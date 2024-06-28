@@ -111,7 +111,7 @@ fn main() -> Result<(), EspError> {
 
     let mut simple_document = simple_view::create_view(128, 32);
 
-    let mut document = create_view(128, 32, input);
+    // let mut document = create_view(128, 32, input);
 
     let mut update_timer = Timer::new(Duration::from_millis(25), true);
     let mut draw_timer = Timer::new(Duration::from_millis(50), true);
@@ -129,8 +129,10 @@ fn main() -> Result<(), EspError> {
     // canvas.draw(&mut display).unwrap();
     // display.flush().unwrap();
 
+    let mut canvas = simple_gui::Canvas::new(128, 32);
+
     loop {
-        document.update_input();
+        // document.update_input();
 
         // if debug_timer.run() {
         //     log::info!(
@@ -142,14 +144,15 @@ fn main() -> Result<(), EspError> {
         // }
 
         if update_timer.run() {
-            document.update();
+            // document.update();
             simple_document.update();
             simple_document.layout();
         }
 
         if draw_timer.run() {
-            let canvas: gui::render::Canvas = document.draw();
-            simple_document.draw();
+            canvas.clear();
+            simple_document.draw(&mut canvas);
+            // let canvas: gui::render::Canvas = document.draw();
             canvas.draw(&mut display).unwrap();
             display.flush().unwrap();
         }

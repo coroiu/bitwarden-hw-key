@@ -8,13 +8,17 @@ pub struct Canvas {
 }
 
 impl Canvas {
-    fn new(width: usize, height: usize) -> Canvas {
+    pub fn new(width: usize, height: usize) -> Canvas {
         return Canvas {
             image_buffer: ImageBuffer::new(width, height),
         };
     }
 
-    fn execute(&mut self, command: &RenderCommand) {
+    pub fn clear(&mut self) {
+        self.image_buffer.clear();
+    }
+
+    pub(crate) fn execute(&mut self, command: &RenderCommand) {
         match &command {
             RenderCommand::SolidColor(color, rect) => {
                 SolidColor::new(*color).draw(&mut self.image_buffer, *rect);
