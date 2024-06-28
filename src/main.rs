@@ -1,5 +1,7 @@
 mod esp_input;
 mod gui;
+mod simple_gui;
+mod simple_view;
 mod time;
 mod view;
 
@@ -106,6 +108,8 @@ fn main() -> Result<(), EspError> {
             Box::new(EspPinWrapper(pin_driver_14)),
         ),
     ]));
+
+    let mut simple_document = simple_view::create_view(128, 32);
 
     let mut document = create_view(128, 32, input);
 
