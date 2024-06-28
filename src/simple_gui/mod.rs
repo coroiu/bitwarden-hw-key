@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod components;
 mod controller;
 mod document;

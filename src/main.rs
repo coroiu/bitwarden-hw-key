@@ -143,10 +143,13 @@ fn main() -> Result<(), EspError> {
 
         if update_timer.run() {
             document.update();
+            simple_document.update();
+            simple_document.layout();
         }
 
         if draw_timer.run() {
             let canvas: gui::render::Canvas = document.draw();
+            simple_document.draw();
             canvas.draw(&mut display).unwrap();
             display.flush().unwrap();
         }

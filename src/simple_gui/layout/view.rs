@@ -16,12 +16,24 @@ impl StandaloneView {
     }
 
     #[allow(dead_code)]
-    pub fn children(&self) -> &Vec<Box<dyn Component>> {
+    pub(crate) fn components(&self) -> &Vec<Box<dyn Component>> {
         &self.components
     }
 
-    pub fn children_mut(&mut self) -> &mut Vec<Box<dyn Component>> {
+    pub(crate) fn components_mut(&mut self) -> &mut Vec<Box<dyn Component>> {
         &mut self.components
+    }
+
+    pub(crate) fn update(&mut self) {
+        self.components_mut().iter_mut().for_each(|c| c.update());
+    }
+
+    pub(crate) fn layout(&mut self) {
+        self.components_mut().iter_mut().for_each(|c| c.layout());
+    }
+
+    pub(crate) fn draw(&self) {
+        self.components().iter().for_each(|c| c.draw());
     }
 }
 

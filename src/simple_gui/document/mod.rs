@@ -11,6 +11,18 @@ impl Document {
         }
     }
 
+    pub fn update(&mut self) {
+        self.view.update();
+    }
+
+    pub fn layout(&mut self) {
+        self.view.layout();
+    }
+
+    pub fn draw(&self) {
+        self.view.draw();
+    }
+
     #[allow(dead_code)]
     pub fn components(&self) -> &Vec<Box<dyn Component>> {
         &self.view.components
