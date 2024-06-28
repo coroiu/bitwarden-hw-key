@@ -1,6 +1,8 @@
 mod label;
+mod vertical_menu;
 
 pub use label::*;
+pub use vertical_menu::*;
 
 use super::{primitives::Rectangle, render::RenderCommand};
 
@@ -13,7 +15,5 @@ pub trait Component {
 
     fn layout(&mut self) {}
 
-    fn draw(&self, bounds: Rectangle, commands: &mut Vec<RenderCommand>) {}
-
-    fn get_bounds(&self) -> Rectangle;
+    fn draw(&self, _: Rectangle, _: &mut Vec<RenderCommand>) {}
 }

@@ -1,5 +1,5 @@
 use crate::simple_gui::{
-    primitives::{Color, Point, Rectangle},
+    primitives::{Color, Point, Rectangle, Size},
     render::RenderCommand,
     style::font::Font,
     utils::LowerBound,
@@ -12,7 +12,7 @@ pub struct Label {
     font: &'static Font,
     text: String,
 
-    calulated_bounds: Rectangle,
+    preferred_bounds: Rectangle,
 }
 
 impl Label {
@@ -22,13 +22,11 @@ impl Label {
             font,
             text: text.to_owned(),
 
-            calulated_bounds: Rectangle::new(position.x, position.y, 0, 0),
+            preferred_bounds: Rectangle::new(position.x, position.y, 0, 0),
         }
     }
-}
 
-impl Component for Label {
-    fn layout(&mut self) {
+    pub fn size(&self) -> Size {
         let width = self
             .text
             .chars()
@@ -39,30 +37,32 @@ impl Component for Label {
         let height = self
             .text
             .chars()
-            .map(|c| self.font.get_character(c).image_buffer.height)
+            .map(|c| self.font.get_character(c).image_buffer.height as u32)
             .max()
             .unwrap_or(0);
 
-        let character_bounds = Rectangle {
-            x: self.position.x,
-            y: self.position.y,
-            width: width,
-            height: height as u32,
-        };
+        Size::new(width, height)
+    }
 
-        self.calulated_bounds = character_bounds;
+    pub fn set_position(&mut self, position: Point) {
+        self.position = position;
+    }
+}
+
+impl Component for Label {
+    fn layout(&mut self) {
+        let Size { width, height } = self.size();
+        let character_bounds = Rectangle::new(self.position.x, self.position.y, width, height);
+
+        self.preferred_bounds = character_bounds;
     }
 
     fn draw(&self, bounds: Rectangle, commands: &mut Vec<RenderCommand>) {
         commands.push(RenderCommand::Text(
             Color::white(),
-            bounds,
+            bounds.intersect(self.preferred_bounds).bounds,
             self.text.clone(),
             self.font,
         ));
-    }
-
-    fn get_bounds(&self) -> Rectangle {
-        self.calulated_bounds
     }
 }

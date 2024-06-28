@@ -1,15 +1,35 @@
 use embedded_graphics::{pixelcolor::BinaryColor, Drawable};
 
-use crate::simple_gui::{components::Label, font, primitives::Point, Canvas, Document};
+use crate::simple_gui::{
+    components::{Label, VerticalMenu, VerticalMenuItem},
+    font,
+    primitives::{Point, Rectangle},
+    Canvas, Document,
+};
 
 pub fn create_view(width: u32, height: u32) -> Document {
     let mut document = Document::new(width, height);
 
-    document.components_mut().push(Box::new(Label::new(
-        Point::zero(),
-        &font::FONT_5X8,
-        "Hello world!",
-    )));
+    // document.components_mut().push(Box::new(Label::new(
+    //     Point::zero(),
+    //     &font::FONT_5X8,
+    //     "Hello world!",
+    // )));
+
+    let mut menu = VerticalMenu::new(Rectangle::new(0, 0, 128, 64), &font::FONT_5X8);
+
+    menu.items_mut()
+        .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 1"));
+    menu.items_mut()
+        .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 2"));
+    menu.items_mut()
+        .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 3"));
+    menu.items_mut()
+        .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 4"));
+    menu.items_mut()
+        .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 5"));
+
+    document.components_mut().push(Box::new(menu));
 
     document
 }

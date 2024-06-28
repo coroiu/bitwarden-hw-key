@@ -116,8 +116,8 @@ fn main() -> Result<(), EspError> {
     let mut update_timer = Timer::new(Duration::from_millis(25), true);
     let mut draw_timer = Timer::new(Duration::from_millis(50), true);
 
-    update_timer.start();
-    draw_timer.start();
+    // update_timer.start();
+    // draw_timer.start();
 
     let mut turn_off_timer = Timer::new(Duration::from_secs(30), false);
     turn_off_timer.start();
@@ -125,11 +125,14 @@ fn main() -> Result<(), EspError> {
     let mut debug_timer = Timer::new(Duration::from_millis(200), true);
     debug_timer.start();
 
-    // let canvas: gui::render::Canvas = document.draw();
-    // canvas.draw(&mut display).unwrap();
-    // display.flush().unwrap();
-
     let mut canvas = simple_gui::Canvas::new(128, 32);
+
+    // let canvas: gui::render::Canvas = document.draw();
+    simple_document.update();
+    simple_document.layout();
+    simple_document.draw(&mut canvas);
+    canvas.draw(&mut display).unwrap();
+    display.flush().unwrap();
 
     loop {
         // document.update_input();
