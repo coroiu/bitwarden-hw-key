@@ -1,4 +1,4 @@
-use super::layout::view::StandaloneView;
+use super::{components::Component, layout::view::StandaloneView};
 
 pub struct Document {
     view: StandaloneView,
@@ -9,5 +9,14 @@ impl Document {
         Document {
             view: StandaloneView::new(width, height),
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn components(&self) -> &Vec<Box<dyn Component>> {
+        &self.view.components
+    }
+
+    pub fn components_mut(&mut self) -> &mut Vec<Box<dyn Component>> {
+        &mut self.view.components
     }
 }
