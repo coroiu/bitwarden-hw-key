@@ -41,7 +41,7 @@ impl Component for VerticalMenu {
 
         for item in self.items.iter_mut() {
             item.set_position(Point::new(x, y));
-            println!("item position: {:?}", (x, y));
+            // println!("item position: {:?}", (x, y));
             item.layout();
 
             y += item.size().height as i32 + self.padding as i32;

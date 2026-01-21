@@ -3,10 +3,10 @@ use crate::simple_gui::primitives::{Color, Intersection, Rectangle};
 use super::drawable::Drawable;
 
 #[derive(Clone)]
-pub(crate) struct ImageBuffer {
-    pub(crate) width: usize,
-    pub(crate) height: usize,
-    pub(crate) pixels: Vec<Color>,
+pub struct ImageBuffer {
+    pub width: usize,
+    pub height: usize,
+    pub pixels: Vec<Color>,
 }
 
 impl ImageBuffer {

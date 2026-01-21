@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum KeyCode {
     Up,
     Middle,
