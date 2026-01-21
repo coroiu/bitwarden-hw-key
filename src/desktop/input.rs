@@ -5,17 +5,20 @@ use crate::gui::input::{InputEvent, InputInterface, KeyCode, KeyEvent};
 
 pub struct DesktopInput {
     key_states: HashMap<KeyCode, bool>,
+    pending_events: Vec<InputEvent>,
 }
 
 impl DesktopInput {
     pub fn new() -> Self {
         DesktopInput {
             key_states: HashMap::new(),
+            pending_events: Vec::new(),
         }
     }
 
-    pub fn process_window(&mut self, window: &Window) -> Vec<InputEvent> {
-        let mut events = Vec::new();
+    /// Process window keyboard state and store events internally
+    pub fn process_window(&mut self, window: &Window) {
+        self.pending_events.clear();
 
         // Map keyboard keys to our KeyCode enum
         let key_mappings = [
@@ -30,7 +33,7 @@ impl DesktopInput {
 
             // Detect key press (rising edge)
             if is_pressed && !was_pressed {
-                events.push(InputEvent {
+                self.pending_events.push(InputEvent {
                     key_code: *key_code,
                     key_event: KeyEvent::Clicked,
                 });
@@ -39,16 +42,13 @@ impl DesktopInput {
             // Update state
             self.key_states.insert(*key_code, is_pressed);
         }
-
-        events
     }
 }
 
 impl InputInterface for DesktopInput {
     fn get_events(&mut self) -> Vec<InputEvent> {
-        // Events are collected via process_window
-        // This method is called by the main loop but we handle events differently
-        Vec::new()
+        // Return events collected by process_window
+        self.pending_events.clone()
     }
 
     fn update(&mut self) {

@@ -35,6 +35,9 @@ fn main() {
     let mut document = simple_view::create_view(WIDTH as u32, HEIGHT as u32);
     let mut canvas = simple_gui::Canvas::new(WIDTH, HEIGHT);
 
+    // Initialize focus on first focusable component
+    document.initialize_focus();
+
     // Timing
     let mut last_update = Instant::now();
     let mut last_draw = Instant::now();
@@ -54,11 +57,11 @@ fn main() {
     while window.is_open() {
         let now = Instant::now();
 
-        // Process input
-        let events = input.process_window(&window);
-        if !events.is_empty() {
-            println!("Input events: {:?}", events);
-        }
+        // Process input - update input state
+        input.process_window(&window);
+
+        // Handle input through document
+        document.handle_input(&mut input);
 
         // Update at ~40 fps
         if now.duration_since(last_update) >= update_interval {
