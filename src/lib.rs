@@ -1,5 +1,6 @@
 // Library exports for desktop emulation and shared code
 
+pub mod credentials;
 pub mod gui;
 pub mod simple_gui;
 pub mod simple_view;

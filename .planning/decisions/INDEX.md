@@ -12,6 +12,8 @@ Quick reference for all architectural and technical decisions made in this proje
 
 | Date | Title | Status | File |
 |------|-------|--------|------|
+| 2026-01-22 | Keyboard Emulation Before FIDO2 for PoC | Accepted | [2026-01-22-keyboard-emulation-first.md](2026-01-22-keyboard-emulation-first.md) |
+| 2026-01-22 | Desktop Emulator HTTP Protocol for BLE Simulation | Accepted | [2026-01-22-emulator-http-protocol.md](2026-01-22-emulator-http-protocol.md) |
 | 2026-01-21 | Focus Management System for Simple GUI | Accepted | [2026-01-21-focus-management-system.md](2026-01-21-focus-management-system.md) |
 | 2026-01-21 | Desktop Emulation for Rapid Development | Accepted | [2026-01-21-desktop-emulation.md](2026-01-21-desktop-emulation.md) |
 

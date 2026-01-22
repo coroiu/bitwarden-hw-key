@@ -1,11 +1,35 @@
 # Project Progress
 
-**Last Updated**: 2026-01-21
+**Last Updated**: 2026-01-22 (Phase 1.1 complete)
 
 ## Current Status
-The project is a proof-of-concept for a Bitwarden hardware key running on ESP32. The basic GUI framework is in place with a vertical menu system and component rendering. Desktop emulation with full interactive focus management has been successfully implemented, enabling rapid development iteration without hardware flashing.
+Phase 1.1 complete! The desktop emulator now has a working HTTP server that accepts CBOR-encoded credentials via POST /api/sync. Foundation is solid for building the credential UI in Phase 1.2-1.3.
 
 ## Completed
+- 2026-01-22: Phase 1.1 Foundation complete
+  - Added tiny_http, ciborium, serde, and serde_json dependencies
+  - Created credential data model (Credential, SyncRequest, SyncResponse) in src/credentials/mod.rs
+  - Implemented HTTP server with three endpoints:
+    - POST /api/sync - Accepts CBOR-encoded credentials
+    - GET /api/status - Returns server status and credential count
+    - POST /api/clear - Clears stored credentials
+  - Integrated HTTP server into desktop emulator (runs on localhost:8080)
+  - Desktop emulator detects credential changes from HTTP sync
+  - Created json_to_cbor example tool for testing
+  - Successfully tested all endpoints with curl
+- 2026-01-22: Defined Phase 1 roadmap and testable use-case
+  - Decided on keyboard emulation first (BLE HID), FIDO2 in Phase 2
+  - Created comprehensive technical design document for Phase 1
+  - Designed emulator HTTP protocol (desktop runs server, Web Vault connects)
+  - Updated roadmap with 4-phase approach and 4-week Phase 1 timeline
+  - Documented architectural decisions in three new ADRs
+- 2026-01-22: Completed comprehensive research on ESP32 NVS storage and BLE HID keyboard
+  - Documented NVS API usage with esp-idf-svc Rust bindings
+  - Researched storage capacity limitations and best practices
+  - Identified esp32-nimble as the primary BLE stack for Rust
+  - Documented BLE HID protocol requirements and specifications
+  - Created implementation recommendations and phased roadmap
+  - Updated references with all discovered resources
 - 2026-01-21: Implemented focus management system for simple_gui
   - Created FocusEvent enum (Gained, Lost, Activated) for high-level focus events
   - Extended Component trait with focus methods (is_focusable, on_focus_event, on_input)
@@ -29,15 +53,34 @@ The project is a proof-of-concept for a Bitwarden hardware key running on ESP32.
 - Basic GUI component system
 
 ## In Progress
-- None currently
+None - ready to start Phase 1.2 (Storage)
 
 ## Next Steps
-- Add custom backing components for UI elements
-- Build out additional UI components as needed (buttons, text input, etc.)
-- Implement activation callbacks for menu items
-- Consider adding visual transitions/animations for focus changes
-- Test focus system on actual ESP32 hardware
-- Explore other interaction patterns (long press, double click, etc.)
+
+### Immediate (Phase 1.2 - Storage)
+1. Implement desktop JSON file storage (~/.bitwarden-hw-key/credentials.json)
+2. Load credentials on startup, save on sync
+3. Add timestamp tracking (last_sync field)
+
+### Short-term (Phase 1.3 - GUI)
+1. Create credential list view (reuse VerticalMenu with credential data)
+2. Create credential detail view component
+3. Add navigation between list and detail views
+4. Show/hide password toggle
+
+### Medium-term (Phase 1.4-1.5 - Weeks 2-3)
+1. Build Web Vault Angular component (sync-to-device.component.ts)
+2. Add CBOR encoding to Web Vault
+3. Test end-to-end desktop sync flow
+4. Implement keyboard output on desktop (enigo or autopilot-rs)
+5. Test typing credentials into browser
+
+### Long-term (Phase 1.6-1.7 - Weeks 3-4)
+1. Port HTTP to BLE characteristic writes on ESP32
+2. Implement BLE HID keyboard with esp32-nimble
+3. Configure NVS encryption and BLE bonding
+4. Test on real ESP32 hardware with iOS/Android/Windows/Mac
+5. Polish, performance optimization, and documentation
 
 ## Blockers
 None currently identified

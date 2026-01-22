@@ -1,4 +1,4 @@
-use bitwarden_hw_key::desktop::DesktopInput;
+use bitwarden_hw_key::desktop::{DesktopInput, SyncServer};
 use bitwarden_hw_key::{simple_gui, simple_view};
 use minifb::{Window, WindowOptions};
 use std::time::{Duration, Instant};
@@ -13,6 +13,23 @@ fn main() {
     println!("Starting desktop emulator...");
     println!("Controls: Arrow Up/Down, Space (Middle button)");
     println!("Window size: {}x{} ({}x scale)", WINDOW_WIDTH, WINDOW_HEIGHT, SCALE);
+
+    // Start HTTP server in background thread
+    let server = SyncServer::new("127.0.0.1:8080").expect("Failed to start HTTP server");
+    let credentials = server.get_credentials_ref();
+
+    std::thread::spawn(move || {
+        println!("HTTP server running on http://127.0.0.1:8080");
+        println!("Endpoints:");
+        println!("  POST /api/sync - Sync credentials (CBOR)");
+        println!("  GET  /api/status - Get server status");
+        println!("  POST /api/clear - Clear credentials");
+        loop {
+            if let Err(e) = server.handle_request() {
+                eprintln!("HTTP server error: {}", e);
+            }
+        }
+    });
 
     // Create window
     let mut window = Window::new(
@@ -38,6 +55,9 @@ fn main() {
     // Initialize focus on first focusable component
     document.initialize_focus();
 
+    // Track credential changes
+    let mut last_cred_count = 0;
+
     // Timing
     let mut last_update = Instant::now();
     let mut last_draw = Instant::now();
@@ -56,6 +76,21 @@ fn main() {
 
     while window.is_open() {
         let now = Instant::now();
+
+        // Check for new credentials from HTTP server
+        {
+            let creds = credentials.lock().unwrap();
+            if creds.len() != last_cred_count {
+                println!(
+                    "Credentials updated: {} → {} credentials",
+                    last_cred_count,
+                    creds.len()
+                );
+                last_cred_count = creds.len();
+                // TODO: Update document with new credentials
+                // This will be implemented in Phase 1.3 when we create the credential list view
+            }
+        }
 
         // Process input - update input state
         input.process_window(&window);

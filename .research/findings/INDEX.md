@@ -13,7 +13,7 @@ Quick reference for all research conducted for this project.
 
 | Date | Topic | Status | File |
 |------|-------|--------|------|
-| _No research logged yet_ | | | |
+| 2026-01-22 | ESP32 NVS Storage and BLE HID Keyboard | Complete | [2026-01-22-esp32-nvs-and-ble-hid.md](2026-01-22-esp32-nvs-and-ble-hid.md) |
 
 ## Research Categories
 
