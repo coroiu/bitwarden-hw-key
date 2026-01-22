@@ -1,11 +1,19 @@
 # Project Progress
 
-**Last Updated**: 2026-01-22 (Phase 1.2 complete)
+**Last Updated**: 2026-01-22 (Phase 1.3 partial - credential list view complete)
 
 ## Current Status
-Phase 1.2 complete! Credentials now persist to ./data/credentials.json and are automatically loaded on startup. The emulator is ready for Phase 1.3 (GUI implementation).
+Phase 1.3 in progress! The credential list view is now working - credentials are displayed in a scrollable menu with proper formatting. Next step is to implement the credential detail view.
 
 ## Completed
+- 2026-01-22: Phase 1.3 Credential List View complete
+  - Created create_credential_list_view() function in simple_view.rs
+  - Format: "Name (username)" for each credential
+  - Empty state shows "No credentials" / "Sync from vault"
+  - Desktop emulator recreates view when credentials change
+  - Initial view loads credentials from storage on startup
+  - Tested with 8 credentials - scrolling works perfectly
+  - Added HTTP shutdown endpoint (POST /api/shutdown)
 - 2026-01-22: Phase 1.2 Storage complete
   - Added chrono dependency for timestamps
   - Created DesktopStorage module (src/desktop/storage.rs)
@@ -63,21 +71,16 @@ Phase 1.2 complete! Credentials now persist to ./data/credentials.json and are a
 - Basic GUI component system
 
 ## In Progress
-None - ready to start Phase 1.3 (GUI)
+- Phase 1.3: Credential detail view
 
 ## Next Steps
 
-### Immediate (Phase 1.3 - GUI)
-1. Refactor simple_view.rs to load credentials from shared state
-2. Create credential list view using VerticalMenu
-3. Display credential names in the list
-4. Test scrolling with 10+ credentials
-
-### Short-term (Phase 1.3 - GUI Detail View)
-1. Create credential list view (reuse VerticalMenu with credential data)
-2. Create credential detail view component
-3. Add navigation between list and detail views
-4. Show/hide password toggle
+### Immediate (Phase 1.3 - Credential Detail View)
+1. Create CredentialDetail component in simple_gui/components/
+2. Display credential name, username, URI in detail view
+3. Add password field (hidden by default with "••••••••")
+4. Add navigation: Space to activate item → show detail, Back to return to list
+5. Test detail view with various credentials
 
 ### Medium-term (Phase 1.4-1.5 - Weeks 2-3)
 1. Build Web Vault Angular component (sync-to-device.component.ts)

@@ -58,15 +58,16 @@ fn main() {
     // Create input handler
     let mut input = DesktopInput::new();
 
-    // Create document and canvas
-    let mut document = simple_view::create_view(WIDTH as u32, HEIGHT as u32);
+    // Create document with initial credentials
+    let initial_creds = credentials.lock().unwrap().clone();
+    let mut document = simple_view::create_credential_list_view(&initial_creds, WIDTH as u32, HEIGHT as u32);
     let mut canvas = simple_gui::Canvas::new(WIDTH, HEIGHT);
 
     // Initialize focus on first focusable component
     document.initialize_focus();
 
     // Track credential changes
-    let mut last_cred_count = 0;
+    let mut last_cred_count = initial_creds.len();
 
     // Timing
     let mut last_update = Instant::now();
@@ -103,8 +104,10 @@ fn main() {
                     creds.len()
                 );
                 last_cred_count = creds.len();
-                // TODO: Update document with new credentials
-                // This will be implemented in Phase 1.3 when we create the credential list view
+
+                // Recreate document with updated credentials
+                document = simple_view::create_credential_list_view(&creds, WIDTH as u32, HEIGHT as u32);
+                document.initialize_focus();
             }
         }
 

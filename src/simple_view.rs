@@ -1,5 +1,6 @@
 use embedded_graphics::{pixelcolor::BinaryColor, Drawable};
 
+use crate::credentials::Credential;
 use crate::simple_gui::{
     components::{Label, VerticalMenu, VerticalMenuItem},
     font,
@@ -8,26 +9,33 @@ use crate::simple_gui::{
 };
 
 pub fn create_view(width: u32, height: u32) -> Document {
-    let mut document = Document::new(width, height);
+    create_credential_list_view(&[], width, height)
+}
 
-    // document.components_mut().push(Box::new(Label::new(
-    //     Point::zero(),
-    //     &font::FONT_5X8,
-    //     "Hello world!",
-    // )));
+pub fn create_credential_list_view(credentials: &[Credential], width: u32, height: u32) -> Document {
+    let mut document = Document::new(width, height);
 
     let mut menu = VerticalMenu::new(Rectangle::new(0, 0, width, height), &font::FONT_5X8);
 
-    menu.items_mut()
-        .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 1"));
-    menu.items_mut()
-        .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 2"));
-    menu.items_mut()
-        .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 3"));
-    menu.items_mut()
-        .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 4"));
-    menu.items_mut()
-        .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 5"));
+    if credentials.is_empty() {
+        // Show empty state
+        menu.items_mut()
+            .push(VerticalMenuItem::new(&font::FONT_5X8, "No credentials"));
+        menu.items_mut()
+            .push(VerticalMenuItem::new(&font::FONT_5X8, "Sync from vault"));
+    } else {
+        // Show credentials
+        for cred in credentials {
+            // Format: "Name (username)"
+            let label = if cred.username.is_empty() {
+                cred.name.clone()
+            } else {
+                format!("{} ({})", cred.name, cred.username)
+            };
+            menu.items_mut()
+                .push(VerticalMenuItem::new(&font::FONT_5X8, &label));
+        }
+    }
 
     document.components_mut().push(Box::new(menu));
 
