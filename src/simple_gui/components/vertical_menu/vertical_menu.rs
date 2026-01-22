@@ -1,7 +1,7 @@
 use crate::{
     gui::input::{InputEvent, KeyCode, KeyEvent},
     simple_gui::{
-        components::{Component, FocusEvent},
+        components::{Component, ComponentAction, FocusEvent},
         font::Font,
         primitives::{Point, Rectangle},
     },
@@ -84,7 +84,7 @@ impl Component for VerticalMenu {
         true
     }
 
-    fn on_focus_event(&mut self, event: FocusEvent) {
+    fn on_focus_event(&mut self, event: FocusEvent) -> ComponentAction {
         match event {
             FocusEvent::Gained => {
                 self.is_focused = true;
@@ -93,14 +93,20 @@ impl Component for VerticalMenu {
                 self.is_focused = false;
             }
             FocusEvent::Activated => {
-                // Could emit an event here for the selected item
+                // Call the selected item's on_activate callback if it exists
+                if !self.items.is_empty() && self.selected_index < self.items.len() {
+                    if let Some(ref callback) = self.items[self.selected_index].get_on_activate() {
+                        return callback();
+                    }
+                }
             }
         }
+        ComponentAction::None
     }
 
-    fn on_input(&mut self, events: &[InputEvent]) {
+    fn on_input(&mut self, events: &[InputEvent]) -> ComponentAction {
         if !self.is_focused || self.items.is_empty() {
-            return;
+            return ComponentAction::None;
         }
 
         for event in events {
@@ -132,6 +138,7 @@ impl Component for VerticalMenu {
                 _ => {}
             }
         }
+        ComponentAction::None
     }
 
     fn layout(&mut self) {

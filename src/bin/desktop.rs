@@ -106,15 +106,14 @@ fn main() {
                 last_cred_count = creds.len();
 
                 // Recreate document with updated credentials
+                // This clears the navigation stack and shows the list view
                 document = simple_view::create_credential_list_view(&creds, WIDTH as u32, HEIGHT as u32);
                 document.initialize_focus();
             }
         }
 
-        // Process input - update input state
+        // Process input - navigation is now handled by Document's view stack
         input.process_window(&window);
-
-        // Handle input through document
         document.handle_input(&mut input);
 
         // Update at ~40 fps

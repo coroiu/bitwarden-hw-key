@@ -10,5 +10,6 @@ mod style;
 mod utils;
 
 pub use document::*;
+pub use layout::view::StandaloneView;
 pub use render::Canvas;
 pub use style::font;

@@ -1,5 +1,5 @@
 use crate::simple_gui::{
-    components::{Component, Label},
+    components::{Component, ComponentAction, Label},
     font::Font,
     primitives::{Color, Point, Rectangle, Size},
     render::RenderCommand,
@@ -15,6 +15,7 @@ pub struct VerticalMenuItem {
     scroll_offset: i32,
     scroll_counter: u32,
     max_width: Option<u32>,
+    on_activate: Option<Box<dyn Fn() -> ComponentAction>>,
 }
 
 const HORIZONTAL_MARGIN: u32 = 2;
@@ -32,12 +33,25 @@ impl VerticalMenuItem {
             scroll_offset: 0,
             scroll_counter: 0,
             max_width: None,
+            on_activate: None,
         }
     }
 
     pub fn focusable(mut self, focusable: bool) -> Self {
         self.focusable = focusable;
         self
+    }
+
+    pub fn on_activate<F>(mut self, f: F) -> Self
+    where
+        F: Fn() -> ComponentAction + 'static,
+    {
+        self.on_activate = Some(Box::new(f));
+        self
+    }
+
+    pub fn get_on_activate(&self) -> &Option<Box<dyn Fn() -> ComponentAction>> {
+        &self.on_activate
     }
 
     pub fn set_max_width(&mut self, max_width: u32) {
