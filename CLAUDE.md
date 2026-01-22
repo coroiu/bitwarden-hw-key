@@ -217,12 +217,13 @@ Based on this research, what should we do?
 ### Desktop Emulator Management
 - The desktop emulator runs as `cargo run --bin desktop` and includes an HTTP server on port 8080
 - **CRITICAL**: Never use `pkill -f "desktop"` as it will kill other processes like Docker Desktop
-- To stop the emulator, use one of these safe methods:
-  1. Get the PID: `pgrep -f "target.*debug.*desktop"` then `kill <PID>`
-  2. Use lsof to find the process: `lsof -ti:8080 | xargs kill`
-  3. Store the PID when starting: `cargo run --bin desktop & echo $! > /tmp/desktop-emulator.pid`
-  4. Close the emulator window (GUI method)
-- When running tests, consider using `cargo run --bin desktop 2>&1 &` and capturing the shell job ID
+- To stop the emulator, use one of these safe methods (in order of preference):
+  1. **HTTP shutdown endpoint (RECOMMENDED)**: `curl -X POST http://127.0.0.1:8080/api/shutdown`
+  2. Close the emulator window (GUI method)
+  3. Get the PID: `pgrep -f "target.*debug.*desktop"` then `kill <PID>`
+  4. Use lsof to find the process: `lsof -ti:8080 | xargs kill`
+  5. Store the PID when starting: `cargo run --bin desktop & echo $! > /tmp/desktop-emulator.pid`
+- The HTTP shutdown endpoint provides clean shutdown and doesn't require approval
 - The emulator stores credentials in `./data/credentials.json` (project directory, not user home)
 
 ### Project Context

@@ -1,6 +1,7 @@
 use bitwarden_hw_key::desktop::{DesktopInput, DesktopStorage, SyncServer};
 use bitwarden_hw_key::{simple_gui, simple_view};
 use minifb::{Window, WindowOptions};
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -24,6 +25,7 @@ fn main() {
     let server = SyncServer::new("127.0.0.1:8080", storage.clone())
         .expect("Failed to start HTTP server");
     let credentials = server.get_credentials_ref();
+    let shutdown_signal = server.get_shutdown_signal();
 
     std::thread::spawn(move || {
         println!("HTTP server running on http://127.0.0.1:8080");
@@ -31,6 +33,7 @@ fn main() {
         println!("  POST /api/sync - Sync credentials (CBOR)");
         println!("  GET  /api/status - Get server status");
         println!("  POST /api/clear - Clear credentials");
+        println!("  POST /api/shutdown - Shutdown emulator");
         loop {
             if let Err(e) = server.handle_request() {
                 eprintln!("HTTP server error: {}", e);
@@ -83,6 +86,12 @@ fn main() {
 
     while window.is_open() {
         let now = Instant::now();
+
+        // Check for shutdown signal from HTTP server
+        if shutdown_signal.load(Ordering::Relaxed) {
+            println!("Shutdown requested via HTTP API");
+            break;
+        }
 
         // Check for new credentials from HTTP server
         {

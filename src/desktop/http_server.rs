@@ -1,6 +1,7 @@
 use crate::credentials::{Credential, SyncRequest, SyncResponse};
 use crate::desktop::DesktopStorage;
 use std::error::Error;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tiny_http::{Header, Method, Response, Server, StatusCode};
 
@@ -8,6 +9,7 @@ pub struct SyncServer {
     server: Server,
     credentials: Arc<Mutex<Vec<Credential>>>,
     storage: Arc<Mutex<DesktopStorage>>,
+    should_shutdown: Arc<AtomicBool>,
 }
 
 impl SyncServer {
@@ -28,11 +30,16 @@ impl SyncServer {
             server,
             credentials: Arc::new(Mutex::new(loaded_creds)),
             storage,
+            should_shutdown: Arc::new(AtomicBool::new(false)),
         })
     }
 
     pub fn get_credentials_ref(&self) -> Arc<Mutex<Vec<Credential>>> {
         self.credentials.clone()
+    }
+
+    pub fn get_shutdown_signal(&self) -> Arc<AtomicBool> {
+        self.should_shutdown.clone()
     }
 
     pub fn handle_request(&self) -> Result<(), Box<dyn Error>> {
@@ -42,6 +49,7 @@ impl SyncServer {
             (&Method::Post, "/api/sync") => self.handle_sync(request),
             (&Method::Get, "/api/status") => self.handle_status(request),
             (&Method::Post, "/api/clear") => self.handle_clear(request),
+            (&Method::Post, "/api/shutdown") => self.handle_shutdown(request),
             _ => request
                 .respond(Response::from_string("Not Found").with_status_code(StatusCode(404)))
                 .map_err(|e| e.into()),
@@ -128,6 +136,28 @@ impl SyncServer {
         let response = serde_json::json!({
             "status": "success",
             "message": "Credentials cleared",
+        });
+
+        request
+            .respond(
+                Response::from_string(response.to_string())
+                    .with_header("Content-Type: application/json".parse::<Header>().unwrap())
+                    .with_header(
+                        "Access-Control-Allow-Origin: http://localhost:4200"
+                            .parse::<Header>()
+                            .unwrap(),
+                    ),
+            )
+            .map_err(|e| e.into())
+    }
+
+    fn handle_shutdown(&self, request: tiny_http::Request) -> Result<(), Box<dyn Error>> {
+        // Signal shutdown
+        self.should_shutdown.store(true, Ordering::Relaxed);
+
+        let response = serde_json::json!({
+            "status": "success",
+            "message": "Shutting down emulator",
         });
 
         request
