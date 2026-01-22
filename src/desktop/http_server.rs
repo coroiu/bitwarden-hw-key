@@ -1,4 +1,5 @@
 use crate::credentials::{Credential, SyncRequest, SyncResponse};
+use crate::desktop::DesktopStorage;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use tiny_http::{Header, Method, Response, Server, StatusCode};
@@ -6,14 +7,27 @@ use tiny_http::{Header, Method, Response, Server, StatusCode};
 pub struct SyncServer {
     server: Server,
     credentials: Arc<Mutex<Vec<Credential>>>,
+    storage: Arc<Mutex<DesktopStorage>>,
 }
 
 impl SyncServer {
-    pub fn new(addr: &str) -> Result<Self, Box<dyn Error>> {
+    pub fn new(addr: &str, storage: Arc<Mutex<DesktopStorage>>) -> Result<Self, Box<dyn Error>> {
         let server = Server::http(addr).map_err(|e| format!("Failed to start server: {}", e))?;
+
+        // Load existing credentials from storage
+        let loaded_creds = storage
+            .lock()
+            .unwrap()
+            .load()
+            .unwrap_or_else(|e| {
+                eprintln!("Failed to load credentials: {}", e);
+                Vec::new()
+            });
+
         Ok(Self {
             server,
-            credentials: Arc::new(Mutex::new(Vec::new())),
+            credentials: Arc::new(Mutex::new(loaded_creds)),
+            storage,
         })
     }
 
@@ -40,10 +54,18 @@ impl SyncServer {
 
         let total_bytes = request.body_length().unwrap_or(0);
 
-        // Store credentials
+        // Store credentials in memory
         let mut creds = self.credentials.lock().unwrap();
         *creds = sync_req.credentials;
         let synced = creds.len();
+
+        // Persist to storage
+        self.storage
+            .lock()
+            .unwrap()
+            .save(&creds)
+            .map_err(|e| format!("Failed to save credentials: {}", e))?;
+
         drop(creds);
 
         // Respond with JSON
@@ -91,9 +113,17 @@ impl SyncServer {
     }
 
     fn handle_clear(&self, request: tiny_http::Request) -> Result<(), Box<dyn Error>> {
+        // Clear credentials in memory
         let mut creds = self.credentials.lock().unwrap();
         creds.clear();
         drop(creds);
+
+        // Clear storage file
+        self.storage
+            .lock()
+            .unwrap()
+            .clear()
+            .map_err(|e| format!("Failed to clear storage: {}", e))?;
 
         let response = serde_json::json!({
             "status": "success",

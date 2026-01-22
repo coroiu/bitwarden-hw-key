@@ -214,6 +214,17 @@ Based on this research, what should we do?
 - Hardware: Adafruit HUZZAH32 with 128x32 SSD1306 OLED Feather Wing
 - See README.md for complete setup instructions
 
+### Desktop Emulator Management
+- The desktop emulator runs as `cargo run --bin desktop` and includes an HTTP server on port 8080
+- **CRITICAL**: Never use `pkill -f "desktop"` as it will kill other processes like Docker Desktop
+- To stop the emulator, use one of these safe methods:
+  1. Get the PID: `pgrep -f "target.*debug.*desktop"` then `kill <PID>`
+  2. Use lsof to find the process: `lsof -ti:8080 | xargs kill`
+  3. Store the PID when starting: `cargo run --bin desktop & echo $! > /tmp/desktop-emulator.pid`
+  4. Close the emulator window (GUI method)
+- When running tests, consider using `cargo run --bin desktop 2>&1 &` and capturing the shell job ID
+- The emulator stores credentials in `./data/credentials.json` (project directory, not user home)
+
 ### Project Context
 - This is a proof-of-concept for a Bitwarden hardware key
 - Focus is on embedded GUI development with constrained resources

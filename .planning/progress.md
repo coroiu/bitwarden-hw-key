@@ -1,11 +1,21 @@
 # Project Progress
 
-**Last Updated**: 2026-01-22 (Phase 1.1 complete)
+**Last Updated**: 2026-01-22 (Phase 1.2 complete)
 
 ## Current Status
-Phase 1.1 complete! The desktop emulator now has a working HTTP server that accepts CBOR-encoded credentials via POST /api/sync. Foundation is solid for building the credential UI in Phase 1.2-1.3.
+Phase 1.2 complete! Credentials now persist to ./data/credentials.json and are automatically loaded on startup. The emulator is ready for Phase 1.3 (GUI implementation).
 
 ## Completed
+- 2026-01-22: Phase 1.2 Storage complete
+  - Added chrono dependency for timestamps
+  - Created DesktopStorage module (src/desktop/storage.rs)
+  - Implements JSON file storage at ./data/credentials.json
+  - Credentials automatically loaded on startup
+  - Credentials persisted on sync and cleared on clear
+  - Added last_sync timestamp tracking
+  - Added /data directory to .gitignore
+  - Updated CLAUDE.md with safe emulator management practices
+  - Tested persistence across emulator restarts
 - 2026-01-22: Phase 1.1 Foundation complete
   - Added tiny_http, ciborium, serde, and serde_json dependencies
   - Created credential data model (Credential, SyncRequest, SyncResponse) in src/credentials/mod.rs
@@ -53,16 +63,17 @@ Phase 1.1 complete! The desktop emulator now has a working HTTP server that acce
 - Basic GUI component system
 
 ## In Progress
-None - ready to start Phase 1.2 (Storage)
+None - ready to start Phase 1.3 (GUI)
 
 ## Next Steps
 
-### Immediate (Phase 1.2 - Storage)
-1. Implement desktop JSON file storage (~/.bitwarden-hw-key/credentials.json)
-2. Load credentials on startup, save on sync
-3. Add timestamp tracking (last_sync field)
+### Immediate (Phase 1.3 - GUI)
+1. Refactor simple_view.rs to load credentials from shared state
+2. Create credential list view using VerticalMenu
+3. Display credential names in the list
+4. Test scrolling with 10+ credentials
 
-### Short-term (Phase 1.3 - GUI)
+### Short-term (Phase 1.3 - GUI Detail View)
 1. Create credential list view (reuse VerticalMenu with credential data)
 2. Create credential detail view component
 3. Add navigation between list and detail views

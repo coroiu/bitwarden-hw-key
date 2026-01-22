@@ -48,6 +48,7 @@ button-driver = { version = "0.1.4", features = ["esp", "std"] }
 [target.'cfg(not(target_arch = "xtensa"))'.dependencies]
 minifb = "0.27"
 tiny_http = "0.12"
+chrono = "0.4"
 
 [build-dependencies]
 embuild = "0.31.3"

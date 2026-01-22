@@ -1,6 +1,7 @@
-use bitwarden_hw_key::desktop::{DesktopInput, SyncServer};
+use bitwarden_hw_key::desktop::{DesktopInput, DesktopStorage, SyncServer};
 use bitwarden_hw_key::{simple_gui, simple_view};
 use minifb::{Window, WindowOptions};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 const WIDTH: usize = 128;
@@ -14,8 +15,14 @@ fn main() {
     println!("Controls: Arrow Up/Down, Space (Middle button)");
     println!("Window size: {}x{} ({}x scale)", WINDOW_WIDTH, WINDOW_HEIGHT, SCALE);
 
+    // Create storage
+    let storage = Arc::new(Mutex::new(
+        DesktopStorage::new().expect("Failed to create storage"),
+    ));
+
     // Start HTTP server in background thread
-    let server = SyncServer::new("127.0.0.1:8080").expect("Failed to start HTTP server");
+    let server = SyncServer::new("127.0.0.1:8080", storage.clone())
+        .expect("Failed to start HTTP server");
     let credentials = server.get_credentials_ref();
 
     std::thread::spawn(move || {
