@@ -1,19 +1,27 @@
 # Project Progress
 
-**Last Updated**: 2026-01-22 (Phase 1.3 partial - credential list view complete)
+**Last Updated**: 2026-01-22 (Phase 1.3 partial - list view with marquee scrolling complete)
 
 ## Current Status
-Phase 1.3 in progress! The credential list view is now working - credentials are displayed in a scrollable menu with proper formatting. Next step is to implement the credential detail view.
+Phase 1.3 in progress! The credential list view is now working with marquee text scrolling for long credential names. Next step is to implement the credential detail view.
 
 ## Completed
 - 2026-01-22: Phase 1.3 Credential List View complete
   - Created create_credential_list_view() function in simple_view.rs
   - Format: "Name (username)" for each credential
-  - Empty state shows "No credentials" / "Sync from vault"
+  - Empty state shows "No credentials" / "Sync from vault" (items marked unfocusable)
   - Desktop emulator recreates view when credentials change
   - Initial view loads credentials from storage on startup
   - Tested with 8 credentials - scrolling works perfectly
   - Added HTTP shutdown endpoint (POST /api/shutdown)
+  - Implemented marquee text scrolling for long credential names:
+    - Text automatically scrolls horizontally when focused and exceeds available width
+    - Scroll speed: SCROLL_SPEED=3 frames (tunable constant)
+    - Pauses at beginning and end before wrapping around
+    - Resets to start when item loses focus
+    - Uses character-skipping approach (skips chars from left as offset increases)
+    - Added 1px horizontal margins to prevent text from touching borders
+    - Note: Current text rendering system doesn't support true clipping; may need refactor later
 - 2026-01-22: Phase 1.2 Storage complete
   - Added chrono dependency for timestamps
   - Created DesktopStorage module (src/desktop/storage.rs)
