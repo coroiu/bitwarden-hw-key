@@ -18,7 +18,7 @@ pub struct VerticalMenuItem {
 }
 
 const HORIZONTAL_MARGIN: u32 = 2;
-const SCROLL_SPEED: u32 = 8; // Update every N frames
+const SCROLL_SPEED: u32 = 3; // Update every N frames (lower = faster)
 
 impl VerticalMenuItem {
     pub fn new(font: &'static Font, text: &str) -> Self {
@@ -125,6 +125,7 @@ impl Component for VerticalMenuItem {
 
         // Scroll right until we reach the end, then reset to start
         self.scroll_offset += 1;
+
         if self.scroll_offset > max_scroll + 10 {
             // Add a pause at the end before wrapping
             self.scroll_offset = -10; // Pause at start
@@ -188,37 +189,49 @@ impl Component for VerticalMenuItem {
         }
 
         // Draw text with scrolling and clipping
-        let available_width = self.available_width();
-
-        // Calculate text position with scroll offset
-        let text_x = self.position.x + 1 + HORIZONTAL_MARGIN as i32 - self.scroll_offset.max(0);
-        let text_y = self.position.y + 1;
-
-        // Calculate text bounds
-        let text_width = self.text_width();
-        let text_height = self.label.size().height;
-        let text_rect = Rectangle::new(text_x, text_y, text_width, text_height);
-
-        // Create clipping rectangle (where text should be visible)
-        let clip_rect = Rectangle::new(
+        let original_pos = Point::new(
             self.position.x + 1 + HORIZONTAL_MARGIN as i32,
-            text_y,
-            available_width,
-            text_height,
+            self.position.y + 1,
         );
 
-        // Intersect with both bounds and clip rect
-        let visible_rect = bounds.intersect(clip_rect);
-        if visible_rect.bounds.width > 0 && visible_rect.bounds.height > 0 {
-            let text_visible = visible_rect.bounds.intersect(text_rect);
-            if text_visible.bounds.width > 0 && text_visible.bounds.height > 0 {
-                commands.push(RenderCommand::Text(
-                    Color::white(),
-                    text_visible.bounds,
-                    self.text.clone(),
-                    self.font,
-                ));
+        // Calculate how many characters to skip from the beginning
+        let skip_chars = if self.scroll_offset > 0 {
+            let mut total_width = 0u32;
+            let mut chars_to_skip = 0usize;
+
+            for (i, c) in self.text.chars().enumerate() {
+                let char_width = self.font.get_character(c).image_buffer.width as u32;
+                let spacing = if i > 0 { self.font.letter_spacing as u32 } else { 0 };
+
+                if total_width + char_width <= self.scroll_offset.max(0) as u32 {
+                    total_width += char_width + spacing;
+                    chars_to_skip = i + 1;
+                } else {
+                    break;
+                }
             }
+            chars_to_skip
+        } else {
+            0
+        };
+
+        // Get the substring to display
+        let display_text: String = self.text.chars().skip(skip_chars).collect();
+
+        if !display_text.is_empty() {
+            // Create label with the visible portion of text at original position
+            let mut temp_label = Label::new(original_pos, self.font, &display_text);
+            temp_label.layout();
+
+            // Create clipping rectangle
+            let clip_rect = Rectangle::new(
+                original_pos.x,
+                original_pos.y,
+                self.available_width(),
+                self.label.size().height,
+            );
+
+            temp_label.draw(clip_rect, commands);
         }
     }
 }
