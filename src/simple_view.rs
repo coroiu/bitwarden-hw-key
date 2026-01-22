@@ -18,11 +18,11 @@ pub fn create_credential_list_view(credentials: &[Credential], width: u32, heigh
     let mut menu = VerticalMenu::new(Rectangle::new(0, 0, width, height), &font::FONT_5X8);
 
     if credentials.is_empty() {
-        // Show empty state
+        // Show empty state (unfocusable items)
         menu.items_mut()
-            .push(VerticalMenuItem::new(&font::FONT_5X8, "No credentials"));
+            .push(VerticalMenuItem::new(&font::FONT_5X8, "No credentials").focusable(false));
         menu.items_mut()
-            .push(VerticalMenuItem::new(&font::FONT_5X8, "Sync from vault"));
+            .push(VerticalMenuItem::new(&font::FONT_5X8, "Sync from vault").focusable(false));
     } else {
         // Show credentials
         for cred in credentials {

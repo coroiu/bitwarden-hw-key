@@ -73,6 +73,13 @@ impl VerticalMenu {
 }
 
 impl Component for VerticalMenu {
+    fn update(&mut self) {
+        // Update all items (for marquee scrolling)
+        for item in self.items.iter_mut() {
+            item.update();
+        }
+    }
+
     fn is_focusable(&self) -> bool {
         true
     }
@@ -99,15 +106,27 @@ impl Component for VerticalMenu {
         for event in events {
             match (event.key_code, event.key_event) {
                 (KeyCode::Down, KeyEvent::Clicked) => {
-                    if self.selected_index < self.items.len() - 1 {
-                        self.selected_index += 1;
+                    // Find next focusable item
+                    let mut next = self.selected_index + 1;
+                    while next < self.items.len() && !self.items[next].is_focusable() {
+                        next += 1;
+                    }
+                    if next < self.items.len() {
+                        self.selected_index = next;
                         self.auto_scroll();
                     }
                 }
                 (KeyCode::Up, KeyEvent::Clicked) => {
+                    // Find previous focusable item
                     if self.selected_index > 0 {
-                        self.selected_index -= 1;
-                        self.auto_scroll();
+                        let mut prev = self.selected_index - 1;
+                        while prev > 0 && !self.items[prev].is_focusable() {
+                            prev -= 1;
+                        }
+                        if self.items[prev].is_focusable() {
+                            self.selected_index = prev;
+                            self.auto_scroll();
+                        }
                     }
                 }
                 _ => {}
@@ -120,6 +139,8 @@ impl Component for VerticalMenu {
         let mut y = self.bounds.y - self.scroll as i32;
 
         for (index, item) in self.items.iter_mut().enumerate() {
+            // Constrain item width to menu bounds
+            item.set_max_width(self.bounds.width);
             item.set_position(Point::new(x, y));
             item.set_selected(self.is_focused && index == self.selected_index);
             item.layout();
