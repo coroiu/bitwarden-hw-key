@@ -16,7 +16,7 @@ pub fn create_view(width: u32, height: u32) -> Document {
     //     "Hello world!",
     // )));
 
-    let mut menu = VerticalMenu::new(Rectangle::new(0, 0, 128, 64), &font::FONT_5X8);
+    let mut menu = VerticalMenu::new(Rectangle::new(0, 0, width, height), &font::FONT_5X8);
 
     menu.items_mut()
         .push(VerticalMenuItem::new(&font::FONT_5X8, "Item 1"));

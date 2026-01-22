@@ -81,14 +81,11 @@ impl Component for VerticalMenu {
         match event {
             FocusEvent::Gained => {
                 self.is_focused = true;
-                println!("VerticalMenu gained focus, selected_index: {}", self.selected_index);
             }
             FocusEvent::Lost => {
                 self.is_focused = false;
-                println!("VerticalMenu lost focus");
             }
             FocusEvent::Activated => {
-                println!("VerticalMenu activated (item {} selected)", self.selected_index);
                 // Could emit an event here for the selected item
             }
         }
@@ -105,14 +102,12 @@ impl Component for VerticalMenu {
                     if self.selected_index < self.items.len() - 1 {
                         self.selected_index += 1;
                         self.auto_scroll();
-                        println!("Selected item {}", self.selected_index);
                     }
                 }
                 (KeyCode::Up, KeyEvent::Clicked) => {
                     if self.selected_index > 0 {
                         self.selected_index -= 1;
                         self.auto_scroll();
-                        println!("Selected item {}", self.selected_index);
                     }
                 }
                 _ => {}

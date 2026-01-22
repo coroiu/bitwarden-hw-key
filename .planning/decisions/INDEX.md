@@ -12,6 +12,7 @@ Quick reference for all architectural and technical decisions made in this proje
 
 | Date | Title | Status | File |
 |------|-------|--------|------|
+| 2026-01-21 | Focus Management System for Simple GUI | Accepted | [2026-01-21-focus-management-system.md](2026-01-21-focus-management-system.md) |
 | 2026-01-21 | Desktop Emulation for Rapid Development | Accepted | [2026-01-21-desktop-emulation.md](2026-01-21-desktop-emulation.md) |
 
 ## Decision Categories
