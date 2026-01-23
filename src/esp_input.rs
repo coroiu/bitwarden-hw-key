@@ -4,7 +4,7 @@ use esp_idf_hal::gpio::{Input, PinDriver};
 use crate::gui::input::{InputEvent, InputInterface, KeyCode, KeyEvent};
 
 pub struct EspInput {
-    drivers: Vec<(KeyCode, Button<Box<dyn MyPinWrapper>>)>,
+    drivers: Vec<(KeyCode, Button<Box<dyn MyPinWrapper>, std::time::Instant>)>,
 }
 
 impl EspInput {
@@ -97,11 +97,11 @@ impl<'a, P: esp_idf_hal::gpio::Pin> MyPinWrapper for EspPinWrapper<'a, P> {
 }
 
 impl PinWrapper for Box<dyn MyPinWrapper> {
-    fn is_high(&self) -> bool {
+    fn is_high(&mut self) -> bool {
         self.is_high_wr()
     }
 
-    fn is_low(&self) -> bool {
+    fn is_low(&mut self) -> bool {
         self.is_low_wr()
     }
 }

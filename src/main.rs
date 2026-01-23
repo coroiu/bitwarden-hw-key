@@ -1,3 +1,4 @@
+mod credentials;
 mod esp_input;
 mod gui;
 pub mod simple_gui;

@@ -39,10 +39,10 @@ ciborium = "0.2"
 
 # ESP32-specific dependencies
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-esp-idf-svc = { version = "0.48", default-features = false }
-esp-idf-hal = "0.43.1"
+esp-idf-svc = { version = "0.51", default-features = false }
+esp-idf-hal = "0.45"
 ssd1306 = "0.8.4"
-button-driver = { version = "0.1.4", features = ["esp", "std"] }
+button-driver = { version = "0.2", features = ["esp", "std"] }
 
 # Desktop-specific dependencies
 [target.'cfg(not(target_arch = "xtensa"))'.dependencies]
