@@ -180,9 +180,9 @@ mod desktop {
 
 #[cfg(target_arch = "xtensa")]
 mod desktop {
-    compile_error!("Desktop build is not supported on xtensa targets.");
-
-    pub fn run() {}
+    pub fn run() {
+        println!("Desktop build is not supported on xtensa targets.");
+    }
 }
 
 pub fn main() {

@@ -51,7 +51,8 @@ tiny_http = "0.12"
 chrono = "0.4"
 
 [build-dependencies]
-embuild = "0.33"
+embuild = { version = "0.33", features = ["espidf"] }
+build-target = "0.8.0"
 
 [[bin]]
 name = "esp32"
