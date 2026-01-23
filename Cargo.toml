@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Andreas Coroiu <andreas.coroiu@gmail.com>"]
 edition = "2021"
 resolver = "2"
-rust-version = "1.71"
+rust-version = "1.77"
 
 [profile.release]
 opt-level = "s"
@@ -14,7 +14,7 @@ debug = true    # Symbols are nice and they don't increase the size on Flash
 opt-level = "z"
 
 [features]
-default = ["std", "embassy", "esp-idf-svc/native"]
+default = ["std", "esp-idf-svc/native"]
 
 pio = ["esp-idf-svc/pio"]
 std = ["alloc", "esp-idf-svc/binstart", "esp-idf-svc/std"]
@@ -51,7 +51,7 @@ tiny_http = "0.12"
 chrono = "0.4"
 
 [build-dependencies]
-embuild = "0.31.3"
+embuild = "0.33"
 
 [[bin]]
 name = "esp32"

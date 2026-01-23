@@ -50,7 +50,13 @@ The following steps are based on https://github.com/esp-rs/esp-idf-template#prer
 
 ## Building and flashing
 
+### Running on ESP32
+
 In theory `cargo run` should be enough.
+
+### Desktop emulator
+
+`cargo run --bin desktop --target x86_64-apple-darwin`. You might need to tweak your target depending on your OS.
 
 ### Troubleshooting
 
@@ -79,3 +85,27 @@ Workaround: `CRATE_CC_NO_DEFAULTS=1 cargo run`
   "CRATE_CC_NO_DEFAULTS": "1"
 }
 ```
+
+#### Rust compiler crash (SIGSEGV)
+
+If you get a Rust compiler crash with error:
+```
+error: rustc interrupted by SIGSEGV, printing backtrace
+...
+note: we would appreciate a report at https://github.com/rust-lang/rust
+help: you can increase rustc's stack size by setting RUST_MIN_STACK=16777216
+```
+
+This is caused by the Xtensa LLVM backend requiring more stack space during compilation. The fix has already been added to the `export-esp.sh` file in this repository.
+
+**Solution:** Make sure you're sourcing the `export-esp.sh` file:
+```bash
+. $HOME/export-esp.sh
+```
+
+If you're using a different ESP environment setup, you can manually set:
+```bash
+export RUST_MIN_STACK=16777216
+```
+
+Add this to your shell profile or ESP environment script to make it permanent.
