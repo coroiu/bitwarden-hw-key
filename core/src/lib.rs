@@ -16,23 +16,33 @@
 //!   push protocol) lives in `emulator::desktop`, not here — this crate
 //!   only defines the seam. See the module docs for why the trait has no
 //!   `unlock()`, unlike the original ADR sketch.
-//! - [`render`]: the render core (W3, this bead) — `FrameBuffer565`,
+//! - [`render`]: the render core (W3) — `FrameBuffer565`,
 //!   `Widget`/`Action`/`FocusEvent`, `Screen`/`Navigator`, chrome layout,
 //!   and the `VerticalList` widget.
+//! - [`app::App`]: the platform-free application state (W7, this bead) —
+//!   the "empty-but-real" credential-list shell, wrapping a `Navigator`
+//!   over whatever `VaultItem`s the current `SyncSource` reports.
+//! - [`run::run`]: the unified, `Platform`-generic main loop (W7, this
+//!   bead) that drives an `App` — the one loop shared by all three run
+//!   modes (headless, windowed, real-target).
 //!
-//! The old GUI rendering engines (`gui`/`simple_gui`) are NOT here — they
-//! still live, duplicated, in `firmware` and `emulator` until W7 deletes
-//! them entirely (this bead builds their replacement but does not wire it
-//! up to either binary yet — that's the unified main loop, also W7).
+//! The old GUI rendering engines (`gui`/`simple_gui`) that used to live,
+//! duplicated, in `firmware` and `emulator` are retired as of this bead —
+//! [`app`]/[`run`] plus the render core are their replacement, wired into
+//! both binaries.
 //!
 //! See: .planning/decisions/2026-08-11-portability-boundary-and-workspace-split.md
 
+pub mod app;
 pub mod input;
 pub mod platform;
 pub mod render;
+pub mod run;
 pub mod sync_source;
 pub mod vault_item;
 
+pub use app::App;
 pub use input::NavIntent;
+pub use run::run;
 pub use sync_source::SyncSource;
 pub use vault_item::VaultItem;
