@@ -1,31 +1,59 @@
-mod board;
-mod esp_input;
-mod gui;
-pub mod simple_gui;
-pub mod simple_view;
-mod time;
-mod view;
+//! T-Embed (ESP32-S3) firmware entry point: assembles the real
+//! board adapters (`board::BoardPlatform`) and hands them to the unified,
+//! `Platform`-generic `bhk_core::run` loop — the same loop
+//! `emulator/src/main.rs` drives for the windowed/headless run modes, per
+//! `.planning/decisions/2026-08-11-three-mode-testability.md`.
+//!
+//! Replaces the old HUZZAH32 prototype's direct SSD1306 + 3-button wiring
+//! (`gui`/`simple_gui`/`view`/`simple_view`/`esp_input`/`time`, all deleted
+//! in this bead) — see `board`'s module doc for what is and isn't verified
+//! about the new wiring.
+//!
+//! # No sync transport on real hardware yet
+//!
+//! There is no BLE/USB companion-push transport implemented for the
+//! T-Embed yet (see
+//! `.planning/decisions/2026-08-11-sync-direction-companion-push.md`) —
+//! `emulator`'s `PushSyncSource` wraps an HTTP server that only exists on
+//! the host. [`NoSyncSource`] below is an honest placeholder: an always-
+//! empty vault, not a fake one, so the render pipeline stays real (the
+//! M0 "empty-but-real" shell) while there is nothing yet to sync from.
+//!
+//! # Build-only
+//!
+//! This binary compiles and links for `xtensa-esp32s3-espidf`. It has not
+//! run against real hardware (no T-Embed is attached to the machine this
+//! was written on) — see `board`'s module doc for the full list of
+//! per-adapter unverified assumptions.
 
+mod board;
+
+use std::convert::Infallible;
 use std::time::Duration;
 
-use embedded_graphics::{geometry::Point, image::Image, Drawable};
-use esp_idf_svc::{
-    hal::{
-        delay::FreeRtos,
-        gpio::PinDriver,
-        i2c::*,
-        prelude::{Peripherals, *},
-    },
-    sys::EspError,
-};
-use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
+use bhk_core::{run, App, SyncSource, VaultItem};
+use esp_idf_svc::nvs::EspDefaultNvsPartition;
+use esp_idf_svc::sys::EspError;
 
-use crate::{
-    esp_input::{EspInput, EspPinWrapper},
-    gui::icons::BITWARDEN_LOGO,
-    time::timer::Timer,
-    view::create_view,
-};
+use crate::board::{BoardPeripherals, BoardPlatform, NvsStorage, RotaryEncoderInput, St7789Surface, DISPLAY_HEIGHT, DISPLAY_WIDTH};
+
+/// ~30fps, matching the emulator's `FRAME_BUDGET` — no product reason yet
+/// for the two to differ (no animation, nothing latency-sensitive in this
+/// bead's credential-list shell).
+const FRAME_BUDGET: Duration = Duration::from_millis(33);
+
+/// Placeholder `SyncSource` until a real companion-push transport
+/// (BLE/USB) exists for the board. Always reports an empty vault rather
+/// than fabricating data.
+struct NoSyncSource;
+
+impl SyncSource for NoSyncSource {
+    type Error = Infallible;
+
+    fn sync(&mut self) -> Result<Vec<VaultItem>, Self::Error> {
+        Ok(Vec::new())
+    }
+}
 
 fn main() -> Result<(), EspError> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -35,161 +63,33 @@ fn main() -> Result<(), EspError> {
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
 
-    log::info!("Hello, world!");
+    log::info!("Bitwarden HW Key - T-Embed firmware starting");
 
-    /*******************
-     *   PERIPHERALS   *
-     *******************/
-    let peripherals = Peripherals::take().unwrap();
+    let peripherals = BoardPeripherals::take()?;
 
-    // Built in LED
-    let mut led = PinDriver::output(peripherals.pins.gpio13)?;
+    let display = St7789Surface::new(
+        peripherals.lcd_spi,
+        peripherals.lcd_sclk,
+        peripherals.lcd_mosi,
+        peripherals.lcd_cs,
+        peripherals.lcd_dc,
+        peripherals.lcd_reset,
+        peripherals.lcd_backlight,
+        peripherals.peripheral_power_on,
+    )
+    .expect("failed to initialize the ST7789 display");
 
-    led.set_high()?; // Indicate program start phase
+    let input = RotaryEncoderInput::new(peripherals.encoder_pin_a, peripherals.encoder_pin_b, peripherals.encoder_button)?;
 
-    // OLED Display
-    //
-    // TODO(W7): this whole `main.rs` is the old HUZZAH32 (plain ESP32)
-    // prototype wiring (SSD1306 over I2C + 3-button GPIO input) and is
-    // superseded by the T-Embed `board` module (ST7789/rotary-encoder,
-    // see W6) plus the unified Platform-generic main loop (W7 deletes
-    // this file's old-engine wiring). GPIO22/GPIO23 (the original
-    // HUZZAH32 I2C pins) do not exist on the ESP32-S3 — the chip has no
-    // GPIO22-25 at all — so they only had to be remapped to *some* valid
-    // S3 GPIOs to keep this legacy binary compiling under the W6 target
-    // switch to xtensa-esp32s3-espidf. These pins are arbitrary and do
-    // not reflect the T-Embed's real display wiring (see
-    // `board::board_config` for that); this SSD1306 code will never run
-    // against real T-Embed hardware.
-    let i2c = peripherals.i2c1;
-    let sda = peripherals.pins.gpio8;
-    let scl = peripherals.pins.gpio9;
+    let nvs_partition = EspDefaultNvsPartition::take()?;
+    let storage = NvsStorage::new(nvs_partition)?;
 
-    log::info!("Connecting to OLED");
+    let mut platform = BoardPlatform::new(display, input, storage);
+    let mut app = App::new(u32::from(DISPLAY_WIDTH), u32::from(DISPLAY_HEIGHT), Vec::new());
+    let mut sync = NoSyncSource;
 
-    let config = I2cConfig::new().baudrate(200.kHz().into());
-    let i2c = I2cDriver::new(i2c, sda, scl, &config)?;
+    log::info!("Entering main loop");
+    run(&mut platform, &mut app, &mut sync, FRAME_BUDGET, || true);
 
-    let interface = I2CDisplayInterface::new(i2c);
-    let mut display = Ssd1306::new(interface, DisplaySize128x32, DisplayRotation::Rotate0)
-        .into_buffered_graphics_mode();
-
-    display.init().unwrap();
-    display.flush().unwrap();
-
-    log::info!("Setup finished");
-
-    /*******************
-     *      BOOT       *
-     *******************/
-    // Splash screen
-    Image::new(&BITWARDEN_LOGO.as_image_raw(), Point::new(0, 3))
-        .draw(&mut display)
-        .unwrap();
-    display.flush().unwrap();
-
-    FreeRtos::delay_ms(1000);
-    display.clear_buffer();
-    display.flush().unwrap();
-
-    /*******************
-     *    MAIN LOOP    *
-     *******************/
-    led.set_low()?; // Indicate program main loop phase
-
-    /*******************
-     *   SETUP VIEWS   *
-     *******************/
-
-    let mut pin_driver_15 = PinDriver::input(peripherals.pins.gpio15)?;
-    pin_driver_15.set_pull(esp_idf_hal::gpio::Pull::Up)?;
-    let mut pin_driver_32 = PinDriver::input(peripherals.pins.gpio32)?;
-    pin_driver_32.set_pull(esp_idf_hal::gpio::Pull::Up)?;
-    let mut pin_driver_14 = PinDriver::input(peripherals.pins.gpio14)?;
-    pin_driver_14.set_pull(esp_idf_hal::gpio::Pull::Up)?;
-
-    let input = Box::new(EspInput::new(vec![
-        (
-            gui::input::KeyCode::Up,
-            Box::new(EspPinWrapper(pin_driver_15)),
-        ),
-        (
-            gui::input::KeyCode::Middle,
-            Box::new(EspPinWrapper(pin_driver_32)),
-        ),
-        (
-            gui::input::KeyCode::Down,
-            Box::new(EspPinWrapper(pin_driver_14)),
-        ),
-    ]));
-
-    let mut simple_document = simple_view::create_view(128, 32);
-
-    // let mut document = create_view(128, 32, input);
-
-    let mut update_timer = Timer::new(Duration::from_millis(25), true);
-    let mut draw_timer = Timer::new(Duration::from_millis(50), true);
-
-    // update_timer.start();
-    // draw_timer.start();
-
-    let mut turn_off_timer = Timer::new(Duration::from_secs(30), false);
-    turn_off_timer.start();
-
-    let mut debug_timer = Timer::new(Duration::from_millis(200), true);
-    debug_timer.start();
-
-    let mut canvas = simple_gui::Canvas::new(128, 32);
-
-    // let canvas: gui::render::Canvas = document.draw();
-    simple_document.update();
-    simple_document.layout();
-    simple_document.draw(&mut canvas);
-    canvas.draw(&mut display).unwrap();
-    display.flush().unwrap();
-
-    loop {
-        // document.update_input();
-
-        // if debug_timer.run() {
-        //     log::info!(
-        //         "Pin 15 {:?}, pin 32 {:?}, pin 14 {:?}",
-        //         pin_driver_15.get_level(),
-        //         pin_driver_32.get_level(),
-        //         pin_driver_14.get_level()
-        //     );
-        // }
-
-        if update_timer.run() {
-            // document.update();
-            simple_document.update();
-            simple_document.layout();
-        }
-
-        if draw_timer.run() {
-            canvas.clear();
-            simple_document.draw(&mut canvas);
-            // let canvas: gui::render::Canvas = document.draw();
-            canvas.draw(&mut display).unwrap();
-            display.flush().unwrap();
-        }
-
-        if turn_off_timer.run() {
-            break;
-        }
-
-        // Sleeping here to make sure the watchdog isn't triggered
-        // There is probably a better way to do this
-        FreeRtos::delay_ms(1);
-    }
-
-    log::info!("Test draw finished");
-
-    log::info!("Clearing display");
-    display.clear_buffer();
-    display.flush().unwrap();
-
-    loop {
-        FreeRtos::delay_ms(500);
-    }
+    Ok(())
 }

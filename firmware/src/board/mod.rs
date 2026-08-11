@@ -1,38 +1,36 @@
 //! Lilygo T-Embed (ESP32-S3) board adapter: concrete implementations of
 //! `bhk_core::platform`'s four traits (`DisplaySurface`, `InputSource`,
-//! `Clock`, `Storage`) for the real hardware target.
+//! `Clock`, `Storage`) for the real hardware target, assembled by
+//! [`platform::BoardPlatform`] and driven by the unified
+//! `bhk_core::run` loop from `main.rs` (W7).
 //!
-//! # Scope of this module (W6)
+//! # What is and isn't verified
 //!
-//! This module provides the trait implementations and the pin map. It
-//! deliberately does **not**:
-//! - assemble them into a concrete `bhk_core::platform::Platform` impl,
-//! - wire that into a running main loop, or
-//! - touch `main.rs`'s existing (old HUZZAH32) engine wiring beyond the
-//!   minimal pin fix needed to keep it compiling under the ESP32-S3
-//!   target switch (see `main.rs`'s comment at the OLED-pin setup).
-//!
-//! All of that is the unified Platform-generic main loop, W7, per the M0
-//! epic. Until then, this module exists to prove the T-Embed-specific
-//! code **compiles** for `xtensa-esp32s3-espidf`; nothing here has run
-//! against real hardware (none is attached to the machine this was
-//! written on — no `/dev/tty.*` device, confirmed during the W5 SDK
-//! spike). See each submodule's doc comment for exactly what is and
-//! isn't verified.
-// Definitions only; W7 wires these into a running main loop. Until then,
-// nothing in this binary crate consumes the pub re-exports below (there's
-// no external consumer of a `bin` crate's `pub` items), so both lints
-// fire on every item here.
-#![allow(dead_code, unused_imports)]
+//! This module (and `main.rs`'s wiring of it) **builds and links** for
+//! `xtensa-esp32s3-espidf`. Nothing here has run against real hardware —
+//! there is no T-Embed attached to the machine this was written on (no
+//! `/dev/tty.*` device, confirmed during the W5 SDK spike). See each
+//! submodule's doc comment for exactly what is and isn't verified about
+//! its own piece (pin electrical behavior, panel init sequence, encoder
+//! timing, ...).
 
 pub mod board_config;
 pub mod clock;
 pub mod nvs_storage;
+pub mod platform;
 pub mod rotary_input;
 pub mod st7789_surface;
 
+// Only re-exported at this level if `main.rs` names it directly. This is a
+// `bin` crate with no external consumer of `board`'s `pub` items, so an
+// unused re-export here is flagged by `unused_imports` same as any other
+// unused `use` — the error types (`NvsStorageError`,
+// `St7789Surface{Error,InitError}`) and `EspClock` are still reachable via
+// their own submodule paths if a future caller needs to name them (e.g.
+// to match on a specific error variant); `main.rs` today only propagates
+// them opaquely via `?`/`.expect()`.
 pub use board_config::{BoardPeripherals, DISPLAY_HEIGHT, DISPLAY_WIDTH};
-pub use clock::EspClock;
-pub use nvs_storage::{NvsStorage, NvsStorageError};
+pub use nvs_storage::NvsStorage;
+pub use platform::BoardPlatform;
 pub use rotary_input::RotaryEncoderInput;
-pub use st7789_surface::{St7789Surface, St7789SurfaceError, St7789SurfaceInitError};
+pub use st7789_surface::St7789Surface;

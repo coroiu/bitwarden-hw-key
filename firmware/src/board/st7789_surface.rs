@@ -63,7 +63,14 @@ const SPI_TRANSFER_BUFFER_LEN: usize = 2048;
 const SPI_BAUDRATE_MHZ: u32 = 20;
 
 /// Errors from [`St7789Surface::new`].
+///
+/// `#[allow(dead_code)]`: both variants' inner values are read only
+/// through the derived `Debug` impl (`main.rs` calls `.expect(...)` on
+/// construction, which `Debug`-formats the error into the panic message);
+/// `rustc`'s dead-code analysis doesn't count that as a "real" read of
+/// the field, so it would otherwise warn on every variant here.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum St7789SurfaceInitError {
     /// Failed to acquire or configure a GPIO/SPI peripheral.
     Peripheral(EspError),
@@ -81,7 +88,14 @@ impl From<EspError> for St7789SurfaceInitError {
 /// [`DisplaySurface::Error`] the core's `Error = Infallible` draw path
 /// never has to see — it only reaches whatever calls `flush` on this
 /// concrete type.
+///
+/// `#[allow(dead_code)]`: see the identical note on
+/// `St7789SurfaceInitError` — `run`'s main loop drops a `flush` error
+/// (per its own doc comment on why), so nothing pattern-matches these
+/// fields directly; they exist for whatever future caller wants to
+/// inspect or log them, and for the `Debug` panic-message path.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum St7789SurfaceError {
     /// The SPI write to the panel failed.
     Spi(InterfaceError),
