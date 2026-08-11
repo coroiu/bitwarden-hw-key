@@ -29,3 +29,4 @@ ciborium = "0.2"
 minifb = "0.27"
 tiny_http = "0.12"
 chrono = "0.4"
+image = { version = "0.25.6", default-features = false, features = ["png"] }
