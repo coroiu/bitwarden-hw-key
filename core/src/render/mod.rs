@@ -48,7 +48,7 @@ pub mod widget;
 
 pub use chrome::{compute_chrome, ChromeLayout};
 pub use framebuffer::FrameBuffer565;
-pub use list::{ListItem, VerticalList};
+pub use list::{ListItem, VerticalList, ROW_HEIGHT};
 pub use navigator::Navigator;
 pub use screen::Screen;
 pub use widget::{Action, FocusEvent, Widget};

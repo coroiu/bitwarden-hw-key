@@ -49,10 +49,47 @@ impl ListItem {
     }
 }
 
-/// Pixel height of a single row (label + optional sublabel + padding).
-/// Fixed, like the chrome bar heights in `chrome.rs` — a pixel budget, not
-/// a screen-resolution assumption.
-const ROW_HEIGHT: u32 = 20;
+/// `MonoTextStyle`/`Text` position the glyph at its *baseline* by default
+/// (`Baseline::Alphabetic`), not its top-left. For `FONT_6X10`,
+/// `baseline == 7`: the glyph box is 10px tall, split 7px above the
+/// baseline (ascent) and `10 - 7 = 3px` below it (descent). Getting this
+/// wrong is exactly what caused the row-overflow bug this module was
+/// fixed for (see `ROW_HEIGHT`'s doc comment) — computed from the font's
+/// own metrics here instead of re-deriving/hardcoding it at each call
+/// site.
+const FONT_ASCENT: u32 = FONT_6X10.baseline;
+const FONT_DESCENT: u32 = FONT_6X10.character_size.height - FONT_6X10.baseline;
+
+/// Vertical padding above the label and below the sublabel, and the gap
+/// between the two lines.
+const ROW_PADDING: u32 = 1;
+const LINE_GAP: u32 = 1;
+
+/// Pixel height of a single row (padding + label line + gap + sublabel
+/// line + padding). Fixed, like the chrome bar heights in `chrome.rs` — a
+/// pixel budget, not a screen-resolution assumption.
+///
+/// Derived from `FONT_6X10`'s real metrics so the two text baselines
+/// (`label_baseline_offset`/`sublabel_baseline_offset` below) always fit
+/// entirely inside `[0, ROW_HEIGHT)`. A previous version hardcoded `20`
+/// with baselines at `+12`/`+21`, which put the sublabel's descent 4px
+/// past the row's bottom edge — visually, the *next* row's selection
+/// highlight (opaque, drawn on top) ate the tail of this row's sublabel.
+/// `render_png_dump.rs`'s `text_never_bleeds_past_a_rows_bottom_padding`
+/// test guards against this regressing.
+pub const ROW_HEIGHT: u32 =
+    ROW_PADDING + FONT_ASCENT + FONT_DESCENT + LINE_GAP + FONT_ASCENT + FONT_DESCENT + ROW_PADDING;
+
+/// Baseline y-offset (from a row's top edge) for the label line.
+fn label_baseline_offset() -> i32 {
+    (ROW_PADDING + FONT_ASCENT) as i32
+}
+
+/// Baseline y-offset (from a row's top edge) for the sublabel line —
+/// directly below the label line's descent, plus `LINE_GAP`.
+fn sublabel_baseline_offset() -> i32 {
+    label_baseline_offset() + (FONT_DESCENT + LINE_GAP + FONT_ASCENT) as i32
+}
 
 /// Callback invoked with the selected item on activation. Named as a type
 /// alias purely to keep `VerticalList`'s field type readable.
@@ -206,7 +243,7 @@ impl Widget for VerticalList {
 
             Text::new(
                 &item.label,
-                Point::new(area.top_left.x + 4, row_top + 12),
+                Point::new(area.top_left.x + 4, row_top + label_baseline_offset()),
                 text_style,
             )
             .draw(&mut clipped)?;
@@ -214,7 +251,7 @@ impl Widget for VerticalList {
             if let Some(sublabel) = &item.sublabel {
                 Text::new(
                     sublabel,
-                    Point::new(area.top_left.x + 4, row_top + 12 + 9),
+                    Point::new(area.top_left.x + 4, row_top + sublabel_baseline_offset()),
                     sub_style,
                 )
                 .draw(&mut clipped)?;
