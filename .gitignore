@@ -3,3 +3,9 @@
 /target
 /Cargo.lock
 /data
+
+# Beads task tracking: .beads/ has its own .gitignore that ignores the
+# ephemeral bits (sqlite db/WAL, daemon, socket) while keeping issues.jsonl
+# and config tracked, so task history is shared via git. Do NOT blanket-ignore
+# .beads/ here — it would override that and make the board local-only.
+.mcp.json
