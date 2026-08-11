@@ -1,6 +1,6 @@
 use embedded_graphics::{pixelcolor::BinaryColor, Drawable};
 
-use crate::credentials::Credential;
+use bhk_core::VaultItem;
 use crate::simple_gui::{
     components::{ComponentAction, VerticalMenu, VerticalMenuItem},
     font,
@@ -14,7 +14,7 @@ pub fn create_view(width: u32, height: u32) -> Document {
 
 /// Create a standalone view for the credential list
 fn create_credential_list_standalone_view(
-    credentials: &[Credential],
+    credentials: &[VaultItem],
     width: u32,
     height: u32,
 ) -> StandaloneView {
@@ -54,7 +54,7 @@ fn create_credential_list_standalone_view(
     view
 }
 
-pub fn create_credential_list_view(credentials: &[Credential], width: u32, height: u32) -> Document {
+pub fn create_credential_list_view(credentials: &[VaultItem], width: u32, height: u32) -> Document {
     let mut document = Document::new(width, height);
     let view = create_credential_list_standalone_view(credentials, width, height);
 
@@ -66,7 +66,7 @@ pub fn create_credential_list_view(credentials: &[Credential], width: u32, heigh
 
 /// Create a standalone view for credential detail
 fn create_credential_detail_standalone_view(
-    credential: &Credential,
+    credential: &VaultItem,
     width: u32,
     height: u32,
 ) -> StandaloneView {
@@ -127,7 +127,7 @@ fn create_credential_detail_standalone_view(
     view
 }
 
-pub fn create_credential_detail_view(credential: &Credential, width: u32, height: u32) -> Document {
+pub fn create_credential_detail_view(credential: &VaultItem, width: u32, height: u32) -> Document {
     let mut document = Document::new(width, height);
     let view = create_credential_detail_standalone_view(credential, width, height);
 

@@ -1,0 +1,31 @@
+[package]
+name = "emulator"
+version = "0.1.0"
+authors = ["Andreas Coroiu <andreas.coroiu@gmail.com>"]
+edition = "2021"
+rust-version = "1.77"
+
+# Host-only crate: minifb/tiny_http/chrono don't support xtensa, so this
+# package must be built with an explicit host --target override (the
+# workspace-root .cargo/config.toml defaults to xtensa-esp32-espidf for
+# the firmware crate). See README.md for the exact command.
+
+[lib]
+name = "emulator"
+path = "src/lib.rs"
+
+[[bin]]
+name = "desktop"
+path = "src/main.rs"
+
+[dependencies]
+bhk-core = { path = "../core" }
+once_cell = "1.19.0"
+uuid = { version = "1.8.0", features = ["v4", "serde"] }
+embedded-graphics = "0.8.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ciborium = "0.2"
+minifb = "0.27"
+tiny_http = "0.12"
+chrono = "0.4"

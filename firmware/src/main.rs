@@ -1,14 +1,9 @@
-mod credentials;
 mod esp_input;
 mod gui;
 pub mod simple_gui;
 pub mod simple_view;
 mod time;
 mod view;
-
-// Desktop emulation support (only compiled for non-ESP32 targets)
-#[cfg(not(target_arch = "xtensa"))]
-pub mod desktop;
 
 use std::time::Duration;
 
