@@ -1,11 +1,13 @@
 # Project Progress
 
-**Last Updated**: 2026-01-22 (Phase 1.3 partial - list view with marquee scrolling complete)
+**Last Updated**: 2026-08-11 (Vision re-grounded, pivoting to M0 platform migration)
 
 ## Current Status
-Phase 1.3 in progress! The credential list view is now working with marquee text scrolling for long credential names. Next step is to implement the credential detail view.
+The project vision has been re-grounded to focus on the Lilygo T-Embed (ESP32-S3, 320x170 color ST7789, rotary encoder) as the first concrete target. The old 128x32 mono OLED prototype work is complete but treated as throwaway pending a green-field GUI redesign. Current focus: **M0 (Platform Migration)**, which has not started yet. M0 will be run as a beads epic and includes architect-led UI framework design, formalization of the three run modes (headless, windowed, real-target), and an SDK feasibility spike.
 
-## Completed
+## Completed (Prototype Era: 128x32 Mono OLED + 3-Button Navigation)
+Historical work from the initial Adafruit HUZZAH32 prototype. Treated as throwaway pending M0 green-field redesign. Salvageable components: credential data model, sync/storage layer concept.
+
 - 2026-01-22: Phase 1.3 Credential List View complete
   - Created create_credential_list_view() function in simple_view.rs
   - Format: "Name (username)" for each credential
@@ -79,34 +81,45 @@ Phase 1.3 in progress! The credential list view is now working with marquee text
 - Basic GUI component system
 
 ## In Progress
-- Phase 1.3: Credential detail view
+
+### M0 (Platform Migration): Design Complete, Foundation Implementation Underway
+
+**2026-08-11**: M0 foundational architecture has been designed and formally documented. Five M0 decisions (ADRs) recorded in `.planning/decisions/`:
+
+1. **Presentation Surface and Run-Mode Seam** — Platform abstraction with four injected traits (DisplaySurface, InputSource, Clock, Storage). Canonical pixel format: Rgb565 throughout the core. Headless, windowed, and real-target differ only in surface implementation.
+2. **Portability Boundary and Workspace Split** — Three-layer Cargo workspace (`core` / `firmware` / `emulator`) enforcing platform separation at compile time. No platform-specific dependencies in the core; trait implementations live in platform-specific crates.
+3. **Rotary Encoder Input Model and Navigation Intent** — Two-tier input abstraction: raw platform events → semantic `NavIntent` enum. Encoder mapping: rotation → Next/Prev, fast rotation → NextN (acceleration), short press → Activate, long press → Back. Headless agents inject `NavIntent` directly; app is hardware-agnostic.
+4. **Sync Source Abstraction and Deferred SDK Decision** — `SyncSource` trait allows `PushSyncSource` (fallback, works now) and `SdkSyncSource` (spike research) to coexist. M0 uses push; spike (W8) runs in parallel; final choice (SDK viable or fallback) recorded in post-spike ADR.
+5. **UI Framework: Retire Both Existing GUIs, Rewrite Clean** — Both `src/gui/` (dead code) and `src/simple_gui/` (architecturally incompatible with color) are deprecated. Rewrite on `embedded-graphics` + `embedded-graphics-framebuf` + `u8g2-fonts` + `mipidsi`. Salvage high-level concepts only (navigation stack, ComponentAction, FocusEvent); re-implement cleanly. Layout: fixed chrome + linear stacks, no flexbox.
+
+Beads epic `ai-bitwarden-hw-key-8d7` created with workstreams:
+- **W1 (complete)**: Record M0 ADRs and planning updates (this bead).
+- **W2**: Implement platform traits and workspace split (Ruby).
+- **W3**: Build new GUI framework on embedded-graphics (Fern, Ruby).
+- **W4**: Implement three run modes (headless, windowed, real-target) (Tess, Ruby).
+- **W5**: Port to T-Embed hardware and verify (Ruby, Tess).
+- **W6–W7**: UI design (rotary encoder UX, color layout) (Uma).
+- **W8 (parallel)**: Bitwarden Rust SDK feasibility spike (Ruby).
+- **W9**: M0 integration and closure.
+
+Next: W2–W7 (foundation implementation) proceed in parallel; W8 (spike) runs independently.
 
 ## Next Steps
 
-### Immediate (Phase 1.3 - Credential Detail View)
-1. Create CredentialDetail component in simple_gui/components/
-2. Display credential name, username, URI in detail view
-3. Add password field (hidden by default with "••••••••")
-4. Add navigation: Space to activate item → show detail, Back to return to list
-5. Test detail view with various credentials
+### M0 (Platform Migration) Breakdown
+This will be structured as a beads epic once Ada (architect) and Fern (fe-architect) complete their green-field design. Anticipated work domains:
 
-### Medium-term (Phase 1.4-1.5 - Weeks 2-3)
-1. Build Web Vault Angular component (sync-to-device.component.ts)
-2. Add CBOR encoding to Web Vault
-3. Test end-to-end desktop sync flow
-4. Implement keyboard output on desktop (enigo or autopilot-rs)
-5. Test typing credentials into browser
+1. **UI Framework Design & Implementation** (Ada, Fern): Decide on reuse vs rewrite vs OSS. Design the component model, layout engine, and input/navigation pipeline for color display + rotary encoder.
+2. **Three Run Modes Formalization** (Tess): Implement headless (agent-driven, screenshot-captured), windowed (minifb, human), and real-target (T-Embed) harnesses as equivalent, testable code paths.
+3. **SDK Feasibility Spike** (Ruby): Can the Bitwarden Rust SDK (async, HTTP, TLS, KDF) link and fit on ESP32-S3? Identify unlock latency risks and session-key design needs.
+4. **Empty UI Shell on Hardware**: Get a minimal but real color UI running and drivable via rotary encoder on both emulator and T-Embed hardware.
 
-### Long-term (Phase 1.6-1.7 - Weeks 3-4)
-1. Port HTTP to BLE characteristic writes on ESP32
-2. Implement BLE HID keyboard with esp32-nimble
-3. Configure NVS encryption and BLE bonding
-4. Test on real ESP32 hardware with iOS/Android/Windows/Mac
-5. Polish, performance optimization, and documentation
+See `.planning/roadmap.md` for the full milestone sequence and gating questions.
 
 ## Blockers
 None currently identified
 
 ## Notes
+- **2026-08-11 Reconciliation**: Vision re-grounded. Old prototype (128x32 SSD1306, 3-button nav, simple_gui) is complete as historical work but treated as throwaway pending M0 green-field redesign. Roadmap updated to milestone-based structure (M0 through M4) centered on T-Embed first target and color + rotary encoder UX. Work will proceed via beads epic workflow.
 - WIP.md has been migrated to this progress tracking system (2026-01-21)
 - Project structure modernized with .planning and .research directories (2026-01-21)

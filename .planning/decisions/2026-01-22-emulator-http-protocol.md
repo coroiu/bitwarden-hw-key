@@ -1,7 +1,16 @@
 # Desktop Emulator HTTP Protocol for BLE Simulation
 
 **Date**: 2026-01-22
-**Status**: Accepted
+**Status**: Superseded (2026-08-11), demoted to development/fallback mechanism
+
+> **2026-08-11 update:** This HTTP + CBOR push protocol is no longer the product sync
+> path. The 2026-08-11 vision session set the direction that the device is a
+> first-class Bitwarden client that authenticates, syncs, and decrypts on-device via
+> the Bitwarden Rust SDK (see `../roadmap.md`). This local HTTP push (the Web Vault or
+> a companion pushing already-decrypted credentials to the emulator) is retained only
+> as a development aid and as the fallback if the on-device SDK feasibility spike shows
+> direct server sync is impractical on the ESP32-S3 for now. The endpoint and CBOR
+> design below still accurately describe that dev/fallback path.
 
 ## Context
 

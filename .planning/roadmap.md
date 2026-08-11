@@ -2,278 +2,128 @@
 
 High-level vision and milestones for the Bitwarden Hardware Key proof-of-concept.
 
-**Last Updated**: 2026-01-22
+**Last Updated**: 2026-08-11
 
 ## Project Vision
 
-Create a hardware-based Bitwarden key using an ESP32 microcontroller with an OLED display. The device will provide a secure, portable way to access Bitwarden credentials without relying on a smartphone or computer screen.
+The device is a **Bitwarden hardware companion**: a pocketable device with its own
+color screen that lets you browse your Bitwarden vault and type credentials into any
+machine, with no phone or trusted computer required. The framing for this is the
+**"portable vault, screen included."**
 
-**Ultimate Goal**: Support FIDO2/passkeys with CTAP2 protocol for modern passwordless authentication.
+**Audience & ambition:** a credible, reliable *internal demo* that could plausibly
+seed real Bitwarden product thinking (between "show it to colleagues" and "aspiring
+real product"). It must feel real and work in front of people. Security model and
+standards-compliance are forward-looking constraints we don't design ourselves out
+of, not things we harden or audit yet.
 
-**Phase 1 Goal**: Validate hardware UX viability with keyboard emulation before investing in FIDO2 implementation.
+**North star, sequenced:**
+1. **Portable vault** first: browse credentials and type them over USB HID and/or BLE HID.
+2. **FIDO2 / passkeys** second: the same device also acts as a Bitwarden-native CTAP2 authenticator.
 
-## Current Phase: Phase 1 - Keyboard Emulation PoC
+**Trust model:** the device is a **first-class Bitwarden client** that authenticates,
+syncs, and decrypts on-device using the **Bitwarden Rust SDK**. This is the committed
+direction. Its near-term feasibility on the ESP32-S3 (SDK footprint, async/TLS stack,
+KDF cost) is unproven and gated behind an early feasibility spike. A trusted-client
+push path (companion or Web Vault) is the fallback if on-device sync proves impractical.
 
-**Goal**: Prove that browsing and using credentials on 128x32 display with 3-button navigation is practical and usable.
+**Hardware:** the Lilygo T-Embed (ESP32-S3, 320x170 color ST7789, rotary encoder,
+8MB PSRAM) is the **first concrete target, not the final form factor.** The UI and
+architecture are built to be hardware-portable so they can move to other devices later.
 
-**Target Timeline**: 4 weeks
+## Platform Reset
 
-### Completed
-- ✅ ESP32 development environment setup
-- ✅ OLED display driver integration (SSD1306 128x32)
-- ✅ Component-based GUI system (simple_gui)
-- ✅ Vertical menu with scrolling
-- ✅ Focus management system (gained/lost/activated events)
-- ✅ Desktop emulator with minifb (128x32 → 1024x256 window)
-- ✅ Keyboard input handling (Up/Down/Space)
-- ✅ Auto-scrolling to keep focused items visible
+The prior work (128x32 mono SSD1306, 3-button nav, `simple_gui`/`gui`) grew out of
+early experiments into a half-baked solution. The migration to color + rotary encoder
+is the opportunity to **rethink the UI framework and wider architecture from scratch.**
+Ada (architect) and Fern (fe-architect) own that decision: salvage what's reusable,
+rewrite clean, or adopt an existing open-source layer. Treat the existing GUI as
+throwaway unless proven worth keeping.
 
-### In Progress
-- 🔄 HTTP server in desktop emulator for credential sync
-- 🔄 Credential data model and CBOR encoding
-- 🔄 NVS storage for ESP32
-- 🔄 Web Vault integration (Angular component)
+Carries forward regardless of the GUI reset: the credential data model and the concept
+of a sync/storage layer. Demoted: the local HTTP + CBOR *push* protocol (Web Vault to
+emulator) was a development mechanism; with direct server sync as the direction, it
+becomes a fallback/dev aid rather than the product path.
 
-### Next Up (Phase 1 Remaining)
-- Credential list view (reuse existing VerticalMenu)
-- Credential detail view component
-- Keyboard output (BLE HID on ESP32, simulation on desktop)
-- BLE service for credential sync on ESP32
-- End-to-end testing of credential sync → browse → type workflow
+## Milestones
 
-## Phase 1 Breakdown
+### M0: Platform migration (current focus)
+Rebuild the foundation for a color display + rotary encoder, hardware-portable, T-Embed first.
+- Architect-led green-field design of the UI framework + app architecture (reuse vs rewrite vs OSS).
+- Formalize the **three run modes**: headless (agent-driven, screenshot-inspected),
+  windowed (minifb, human, no hardware), real-target (T-Embed).
+- **SDK feasibility spike** (see Open Questions): can the Bitwarden Rust SDK sync +
+  decrypt on the ESP32-S3, and at what unlock cost?
+- *Done when:* an empty-but-real color UI shell runs and is drivable by the encoder in
+  the emulator and on the T-Embed. No new product capability yet, by design.
 
-### Phase 1.1: Foundation ✅ (Week 1)
-- ✅ Desktop emulator working
-- ✅ Focus system implemented
-- 🔄 HTTP server in desktop emulator
-- 🔄 Credential data model (Rust struct)
-- 🔄 CBOR encoding/decoding
+### M1: Vault browse (portable vault, part 1)
+- Credential list + detail views designed for color + rotary encoder (Uma-led design).
+- Backed by the sync/storage layer (direction: direct server sync via SDK; fallback: pushed credentials).
+- *Done when:* you can browse your real vault on the color device.
 
-### Phase 1.2: Storage (Week 1-2)
-- Desktop: JSON file storage at `~/.bitwarden-hw-key/credentials.json`
-- ESP32: NVS storage with 16KB encrypted partition
-- Credential persistence across restarts
-- Handle storage full scenarios
+### M2: Type it (portable vault payoff)
+- Credential output over **USB HID and/or BLE HID** (USB the likely primary demo path:
+  no pairing, reliable; BLE the cable-free story).
+- Desktop simulation of typing for the emulated run modes.
+- *Done when:* unlock, browse, type a credential into a real login form, end to end. This is the demo.
 
-### Phase 1.3: GUI Views (Week 2)
-- Credential list view (reuse VerticalMenu with credential data)
-- Credential detail view component
-- Navigation between list and detail views
-- Show/hide password toggle
+### M3: FIDO2 / passkeys (second capability)
+- CTAP2 over the chosen transport; PIN / user-verification UX reimagined for color + encoder.
+- *Done when:* register and authenticate with a passkey on a test site.
 
-### Phase 1.4: Web Vault Integration (Week 2-3)
-- New Angular component: `sync-to-device.component.ts`
-- CBOR encoding in TypeScript
-- HTTP POST to desktop emulator
-- Error handling and user feedback
-- Integration into Web Vault settings/tools page
+### M4: Security & product-readiness (forward-looking)
+- Encryption at rest, auto-lock, session-key unlock optimization, pairing/bonding.
+- Not hardened or audited now; the goal is to not design these out.
 
-### Phase 1.5: Keyboard Output (Week 3)
-- Desktop: Keyboard simulation library (enigo or autopilot-rs)
-- Type username + Tab + password + Enter
-- Handle special characters
-- Timing between keystrokes
+## Open Questions & Risks
 
-### Phase 1.6: ESP32 Hardware Port (Week 3-4)
-- Replace HTTP with BLE characteristic writes
-- Implement BLE HID keyboard with `esp32-nimble`
-- Configure NVS encryption in sdkconfig
-- BLE pairing flow with 6-digit passkey display
-- Test on real hardware with iOS/Android/Windows/Mac
+### Gating (M0)
+1. **Bitwarden Rust SDK on ESP32-S3 (feasibility spike).** [IN PROGRESS]
+   - Does the full dependency tree (async runtime, HTTP, TLS) link and fit within RAM + 8MB PSRAM?
+   - `reqwest`/`tokio` on ESP-IDF, and `rustls` vs ESP-IDF-native `mbedtls`.
+   - KDF cost: Argon2id memory params may exceed practical limits; PBKDF2 iteration
+     time. Unlock latency is the UX risk.
+   - **Mitigation to design in:** re-encode the vault key under a **session key**
+     protected by a faster algorithm, so only the first unlock pays full KDF cost.
+     Session-key support likely needs to be newly added (SDK and/or our layer).
+   - **Decision**: [2026-08-11-sync-source-abstraction.md](./decisions/2026-08-11-sync-source-abstraction.md) defers the final choice (SDK viable or fallback) to post-spike ADR. M0 proceeds with `PushSyncSource` (fallback) while spike runs in parallel (W8).
 
-### Phase 1.7: Testing & Polish (Week 4)
-- Test with 10, 50, 100, 500 credentials
-- Measure scrolling performance
-- Loading indicators and empty states
-- Error messages
-- Documentation
+2. **UI framework: reuse vs rewrite vs OSS.** [RESOLVED]
+   - **Decision**: [2026-08-11-ui-framework-reuse-vs-rewrite.md](./decisions/2026-08-11-ui-framework-reuse-vs-rewrite.md)
+   - **Verdict**: Retire both existing GUIs (`src/gui/` dead code, `src/simple_gui/` architecturally incompatible with color). Rewrite clean on `embedded-graphics` + `embedded-graphics-framebuf` + `u8g2-fonts` + `mipidsi`. Salvage concepts (navigation stack, ComponentAction, FocusEvent) only; re-implement cleanly. Layout: fixed chrome + linear stacks, no flexbox.
 
-### Phase 1 Success Criteria
-- ✅ User can sync 100+ credentials from Web Vault to device
-- ✅ User can browse credentials with smooth scrolling
-- ✅ User can select a credential and have it typed into a login form
-- ✅ Credentials persist across device restarts
-- ✅ Interaction feels natural and usable
+3. **Portability boundary: abstraction without over-engineering.** [RESOLVED]
+   - **Decision**: [2026-08-11-portability-boundary-and-workspace-split.md](./decisions/2026-08-11-portability-boundary-and-workspace-split.md)
+   - **Verdict**: Three-layer Cargo workspace (`core` / `firmware` / `emulator`) with compiler-enforced boundaries. Platform traits (DisplaySurface, InputSource, Clock, Storage) defined in `core`; implementations in platform-specific crates. No custom HAL re-abstraction; use esp-idf-hal and ecosystem drivers directly.
 
-## Phase 2: FIDO2/Passkey Support (Future)
+### Later
+4. **Companion app.** Managing the device from a computer is easier than a rotary
+   encoder (bulk edits, setup, debugging). Likely wanted eventually, but *not* the sync
+   trust anchor if direct server sync works, so not prioritized immediately. Scope TBD.
+5. **FIDO2 UX** on color + encoder: PIN entry, user verification, multi-credential
+   disambiguation. The new input model changes the design space.
+6. **Large vaults** (500+): browsing/search performance on-device.
 
-**Goal**: Add CTAP2 authenticator capabilities for passwordless authentication
+## Related Decisions
 
-**Prerequisites**: Phase 1 complete and validated that hardware UX works
+ADRs in `.planning/decisions/` implementing M0 architecture:
 
-### Planned Features
-- CTAP2 protocol implementation using `passkey-rs`
-- BLE FIDO2 service (separate from HID)
-- Credential creation (makeCredential)
-- Credential assertion (getAssertion)
-- User verification (PIN entry UI)
-- Discoverable credentials support
-- Resident key management
+### M0 Foundation (all Accepted as of 2026-08-11)
+- **[2026-08-11 Presentation Surface and Run-Mode Seam](./decisions/2026-08-11-presentation-surface-run-mode-seam.md)**: Platform abstraction with four injected traits; Rgb565 canonical format; shared framebuffer across three modes.
+- **[2026-08-11 Portability Boundary and Workspace Split](./decisions/2026-08-11-portability-boundary-and-workspace-split.md)**: Three-layer Cargo workspace (core/firmware/emulator); compiler-enforced boundary; no custom HAL re-abstraction.
+- **[2026-08-11 Rotary Encoder Input Model and Navigation Intent](./decisions/2026-08-11-rotary-encoder-input-model.md)**: Semantic `NavIntent` abstraction; encoder mapping; headless input injection.
+- **[2026-08-11 Sync Source Abstraction and Deferred SDK Decision](./decisions/2026-08-11-sync-source-abstraction.md)**: `SyncSource` trait decouples app from sync provider; M0 uses fallback push; spike (W8) decides SDK viability.
+- **[2026-08-11 UI Framework: Retire Both Existing GUIs, Rewrite Clean](./decisions/2026-08-11-ui-framework-reuse-vs-rewrite.md)**: Deprecate `src/gui/` and `src/simple_gui/`; rewrite on embedded-graphics; retain concepts only.
+- **[2026-08-11 Three Run Modes for Agent-Testable Development](./decisions/2026-08-11-three-mode-testability.md)** (Accepted): Formalized via the five decisions above.
 
-### Technical Requirements
-- Integrate `passkey-rs` crate
-- Implement CTAP2 over BLE transport
-- Design PIN entry on 3-button interface
-- Store FIDO2 credentials in NVS
-- Handle credential selection for multiple accounts
-
-### Design Challenges
-- PIN entry UX on 128x32 display with 3 buttons
-- Distinguishing FIDO2 from password credentials in UI
-- Managing both keyboard emulation and FIDO2 modes
-- User verification requirements
-
-## Phase 3: Security Hardening (Future)
-
-**Goal**: Production-grade security implementation
-
-### Planned Features
-- Credential encryption at rest (beyond NVS encryption)
-- Key derivation from user master PIN
-- Device authentication with Web Vault
-- Auto-lock timeout
-- Secure boot configuration
-- Side-channel attack mitigations
-- Secure memory clearing
-- Tamper detection
-
-### Technical Requirements
-- Implement KDF for encryption keys
-- Store master key securely
-- Flash encryption
-- Secure element integration (if hardware supports)
-- Security audit
-
-## Phase 4: Advanced Features (Future)
-
-**Goal**: Enhanced usability and functionality
-
-### Potential Features
-- TOTP/2FA code generation
-- Search/filter for large vaults
-- Favorite credentials (quick access)
-- Multiple vault support
-- OTA firmware updates
-- Battery optimization
-- Better visual design with icons
-- WiFi sync (alternative to BLE)
-
-### Challenges
-- Display size constraints for search UI
-- Memory usage with large vaults
-- Power consumption
-- Secure OTA implementation
-
-## Architecture Decisions
-
-Key architectural decisions are documented in `.planning/decisions/`:
-
-- **[2026-01-22: Keyboard Emulation First](decisions/2026-01-22-keyboard-emulation-first.md)** - Why we're starting with BLE HID keyboard instead of FIDO2
-- **[2026-01-22: Emulator HTTP Protocol](decisions/2026-01-22-emulator-http-protocol.md)** - Desktop emulator runs HTTP server for Web Vault to connect to
-- **[2026-01-21: Desktop Emulation](decisions/2026-01-21-desktop-emulation.md)** - Separate binary with target-specific dependencies
-- **[2026-01-21: Focus Management System](decisions/2026-01-21-focus-management-system.md)** - High-level focus events instead of raw input
-
-## Open Questions
-
-### Phase 1
-1. **Desktop keyboard simulation**: Which Rust library?
-   - `enigo`? `autopilot-rs`? `rdev`?
-   - Need cross-platform support (macOS, Linux, Windows)
-
-2. **Large vaults**: How to handle 500+ credentials?
-   - Pagination in UI? Lazy loading? Search?
-   - Performance testing needed
-
-3. **Duplicate credentials**: Multiple logins for same site?
-   - Show submenu? Number them?
-
-4. **Special characters**: How to type non-ASCII passwords over BLE HID?
-   - Unicode keyboard support? Fallback to clipboard?
-
-### Phase 2 (FIDO2)
-1. **PIN entry UX**: How to enter 4-8 digit PIN with 3 buttons?
-   - Scroll through digits 0-9?
-   - T9-style input?
-   - Companion app for setup?
-
-2. **User verification**: PIN only, or biometric via phone?
-   - ESP32 has no biometric sensors
-   - Could leverage paired phone's biometrics?
-
-3. **Credential selection**: FIDO2 allows multiple credentials per RP
-   - How to disambiguate on small display?
-
-## Success Criteria
-
-### Phase 1 Success (Keyboard Emulation)
-- ✅ Can sync 100+ credentials from Web Vault in < 5 seconds
-- ✅ Can browse credentials with < 50ms scroll latency
-- ✅ Can select credential and type it into login form successfully
-- ✅ Credentials persist across restarts
-- ✅ BLE pairing works on iOS/Android/Windows/Mac
-- ✅ Typing speed feels natural (not too fast or slow)
-- ✅ Hardware form factor is validated as usable
-
-### Phase 2 Success (FIDO2)
-- Can register passkey on test website
-- Can authenticate with passkey
-- User verification flow works
-- Multiple passkeys managed correctly
-- CTAP2 protocol compliance
-
-### Phase 3 Success (Security)
-- Credentials encrypted at rest with user PIN
-- Auto-lock after timeout
-- Secure boot enabled
-- Security audit passed
-- No credentials leak in memory dumps
-
-### Full PoC Success
-- End-to-end passwordless authentication works
-- Security model is sound
-- UX is pleasant and efficient
-- Performance is acceptable
-- Code is maintainable and documented
-
-## Timeline
-
-### Phase 1: 4 weeks (estimated)
-- Week 1: Foundation + Storage
-- Week 2: GUI Views + Web Vault
-- Week 3: Keyboard Output + ESP32 Port
-- Week 4: Testing + Polish
-
-### Phase 2: TBD
-- Depends on Phase 1 validation
-- Estimated 4-6 weeks
-
-### Phase 3+: Future
-- Timeline TBD based on priorities
-
-**Note**: This is a proof-of-concept project. Timelines are estimates for planning purposes. The focus is on learning and validation rather than strict delivery dates.
-
-## Key Milestones
-
-- 🎯 **Phase 1.1 Complete**: Desktop emulator can receive credentials via HTTP
-- 🎯 **Phase 1.3 Complete**: Can browse credentials on device
-- 🎯 **Phase 1.5 Complete**: Can type credentials into browser
-- 🎯 **Phase 1.6 Complete**: Works on real ESP32 hardware
-- 🎯 **Phase 1 Complete**: Hardware UX validated as viable
-- 🎯 **Phase 2 Complete**: FIDO2 authentication working
-- 🎯 **Phase 3 Complete**: Production-ready security
-
-## Related Documentation
-
-- **Technical Design**: [technical-design-phase1.md](technical-design-phase1.md) - Detailed Phase 1 architecture
-- **Research Findings**: [.research/findings/](../.research/findings/) - Research on NVS, BLE HID, etc.
-- **Decision Logs**: [decisions/](decisions/) - ADRs for major decisions
-- **Progress Tracking**: [progress.md](progress.md) - Current status and next steps
+### Prior Decisions (still relevant)
+- **[2026-01-22 Keyboard Emulation First](./decisions/2026-01-22-keyboard-emulation-first.md)** (Accepted): still valid as sequencing (vault before FIDO2); transport now includes USB HID.
+- **[2026-01-22 Emulator HTTP Protocol](./decisions/2026-01-22-emulator-http-protocol.md)** (Superseded): demoted to a dev/fallback push mechanism (now `PushSyncSource`), not the product sync path.
+- **[2026-01-21 Focus Management System](./decisions/2026-01-21-focus-management-system.md)** (Accepted*): high-level design (FocusEvent, opt-in focusability, auto-scroll) retained; transport layer superseded by NavIntent.
+- **[2026-01-21 Desktop Emulation for Rapid Development](./decisions/2026-01-21-desktop-emulation.md)** (Accepted): still valid; emulator is one of three run modes.
 
 ## Notes
-
-- This roadmap will evolve as we learn more about the technical constraints and possibilities
-- Document major decisions in `.planning/decisions/` as they're made
-- Update this roadmap when priorities or direction change
-- Phase 1 is focused on **validation**, not perfection - we're testing the core hypothesis
-- FIDO2 (Phase 2) only happens if Phase 1 proves the hardware UX is viable
+- Proof-of-concept focused on **validation**, not perfection.
+- FIDO2 (M3) is gated on the portable-vault experience (M1-M2) proving the hardware UX.
+- Update this roadmap when direction or priority changes; record hard-to-reverse choices as ADRs.

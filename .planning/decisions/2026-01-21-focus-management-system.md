@@ -1,8 +1,10 @@
 # Focus Management System for Simple GUI
 
 **Date**: 2026-01-21
-**Status**: Accepted
+**Status**: Accepted (transport superseded, high-level design retained)
 **Category**: Architecture, UI/UX
+
+**Superseding Decision**: [2026-08-11-rotary-encoder-input-model.md](2026-08-11-rotary-encoder-input-model.md) replaces the transport layer (KeyCode-based) with `NavIntent`-based routing. The high-level `FocusEvent` enum, opt-in focusability, and auto-scroll remain valid and are retained in the new framework.
 
 ## Context
 

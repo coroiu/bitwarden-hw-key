@@ -1,7 +1,9 @@
 # Three Run Modes for Agent-Testable Development
 
 **Date**: 2026-08-11
-**Status**: Proposed
+**Status**: Accepted
+
+**Supporting Decisions**: Implemented via [2026-08-11-presentation-surface-run-mode-seam.md](2026-08-11-presentation-surface-run-mode-seam.md) (display/input abstraction), [2026-08-11-portability-boundary-and-workspace-split.md](2026-08-11-portability-boundary-and-workspace-split.md) (compiler-enforced boundary), and [2026-08-11-rotary-encoder-input-model.md](2026-08-11-rotary-encoder-input-model.md) (headless input injection).
 
 ## Context
 

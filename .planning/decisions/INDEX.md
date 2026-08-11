@@ -12,10 +12,15 @@ Quick reference for all architectural and technical decisions made in this proje
 
 | Date | Title | Status | File |
 |------|-------|--------|------|
-| 2026-08-11 | Three Run Modes for Agent-Testable Development | Proposed | [2026-08-11-three-mode-testability.md](2026-08-11-three-mode-testability.md) |
+| 2026-08-11 | UI Framework: Retire Both Existing GUIs, Rewrite Clean on Embedded-Graphics | Accepted | [2026-08-11-ui-framework-reuse-vs-rewrite.md](2026-08-11-ui-framework-reuse-vs-rewrite.md) |
+| 2026-08-11 | Sync Source Abstraction and Deferred SDK Decision | Accepted | [2026-08-11-sync-source-abstraction.md](2026-08-11-sync-source-abstraction.md) |
+| 2026-08-11 | Rotary Encoder Input Model and Navigation Intent | Accepted | [2026-08-11-rotary-encoder-input-model.md](2026-08-11-rotary-encoder-input-model.md) |
+| 2026-08-11 | Portability Boundary and Workspace Split | Accepted | [2026-08-11-portability-boundary-and-workspace-split.md](2026-08-11-portability-boundary-and-workspace-split.md) |
+| 2026-08-11 | Presentation Surface and Run-Mode Seam | Accepted | [2026-08-11-presentation-surface-run-mode-seam.md](2026-08-11-presentation-surface-run-mode-seam.md) |
+| 2026-08-11 | Three Run Modes for Agent-Testable Development | Accepted | [2026-08-11-three-mode-testability.md](2026-08-11-three-mode-testability.md) |
 | 2026-01-22 | Keyboard Emulation Before FIDO2 for PoC | Accepted | [2026-01-22-keyboard-emulation-first.md](2026-01-22-keyboard-emulation-first.md) |
-| 2026-01-22 | Desktop Emulator HTTP Protocol for BLE Simulation | Accepted | [2026-01-22-emulator-http-protocol.md](2026-01-22-emulator-http-protocol.md) |
-| 2026-01-21 | Focus Management System for Simple GUI | Accepted | [2026-01-21-focus-management-system.md](2026-01-21-focus-management-system.md) |
+| 2026-01-22 | Desktop Emulator HTTP Protocol for BLE Simulation | Superseded | [2026-01-22-emulator-http-protocol.md](2026-01-22-emulator-http-protocol.md) |
+| 2026-01-21 | Focus Management System for Simple GUI | Accepted* | [2026-01-21-focus-management-system.md](2026-01-21-focus-management-system.md) |
 | 2026-01-21 | Desktop Emulation for Rapid Development | Accepted | [2026-01-21-desktop-emulation.md](2026-01-21-desktop-emulation.md) |
 
 ## Decision Categories
@@ -32,3 +37,11 @@ For future organization, consider categorizing decisions by:
 - Keep this index updated whenever you create a new decision file
 - Use the format specified in CLAUDE.md for decision documents
 - Archive deprecated decisions by updating their status rather than removing them
+- `*` = Status applies with caveats (see decision file for details)
+
+## Status Legend
+
+- **Accepted**: Implemented or decided; applies to current work
+- **Proposed**: Under consideration or awaiting stakeholder approval
+- **Superseded**: Replaced by a newer decision (see the newer ADR for rationale)
+- **Deprecated**: No longer applies; kept for historical context
