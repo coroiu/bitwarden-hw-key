@@ -5,5 +5,6 @@
 pub mod credentials;
 pub mod desktop;
 pub mod gui;
+pub mod platform;
 pub mod simple_gui;
 pub mod simple_view;
