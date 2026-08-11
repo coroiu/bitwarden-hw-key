@@ -80,9 +80,20 @@ pub trait SyncSource {
 3. **Post-spike ADR**: record outcome and final choice (keep SDK or promote fallback). Remove the losing implementation.
 4. **M1**: build credential browsing with the chosen sync source.
 
+## Post-Spike Update (2026-08-11)
+
+**SdkSyncSource is DEFERRED.** The SDK feasibility spike (bead `ai-bitwarden-hw-key-8d7.2`) returned a definitive NO-GO: ring's bundled C crypto links wrong-endian on xtensa (insurmountable), and bitwarden-crypto has no seam to use the KDF standalone (unconditionally pulls reqwest/rustls/ring/mockall stack via bitwarden-api-key-connector).
+
+**Outcome**: `PushSyncSource` is the validated product path for M0–M2. The device is a secure display + HID peripheral syncing from a companion app; it does no TLS/HTTP/SDK/crypto work.
+
+**Deferred to epic `ai-bitwarden-hw-key-1sg`** (conditional, private-fork, only revived if companion-push validates the portable-vault concept): on-device first-class SDK client via fork of Bitwarden crates, with xtensa crypto fix, minimal TLS transport, and on-hardware measurement.
+
+**Related**: [2026-08-11-sync-direction-companion-push.md](2026-08-11-sync-direction-companion-push.md) (post-spike decision ADR; resolves the choice deferred here).
+
 ## References
 
 - Owners: Ada (architect), Ruby (rust-embedded-supervisor)
-- Related: [2026-01-22-emulator-http-protocol.md](2026-01-22-emulator-http-protocol.md) (HTTP push is now a fallback, not the product path)
-- Spike: bead `ai-bitwarden-hw-key-8d7.8` (W8, SDK feasibility)
-- Roadmap Open Question 1 (answered by spike; final choice to follow in post-spike ADR)
+- Related: [2026-01-22-emulator-http-protocol.md](2026-01-22-emulator-http-protocol.md) (HTTP push is now the primary path, not a fallback)
+- Spike: bead `ai-bitwarden-hw-key-8d7.2` (W8, SDK feasibility; NO-GO outcome)
+- Post-spike decision: [2026-08-11-sync-direction-companion-push.md](2026-08-11-sync-direction-companion-push.md)
+- Roadmap Open Question 1 (answered by spike; final choice recorded in post-spike ADR)

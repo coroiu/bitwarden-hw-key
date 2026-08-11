@@ -21,11 +21,15 @@ of, not things we harden or audit yet.
 1. **Portable vault** first: browse credentials and type them over USB HID and/or BLE HID.
 2. **FIDO2 / passkeys** second: the same device also acts as a Bitwarden-native CTAP2 authenticator.
 
-**Trust model:** the device is a **first-class Bitwarden client** that authenticates,
-syncs, and decrypts on-device using the **Bitwarden Rust SDK**. This is the committed
-direction. Its near-term feasibility on the ESP32-S3 (SDK footprint, async/TLS stack,
-KDF cost) is unproven and gated behind an early feasibility spike. A trusted-client
-push path (companion or Web Vault) is the fallback if on-device sync proves impractical.
+**Trust model:** the device is a **secure display + HID peripheral** that syncs credentials
+from a **trusted companion app** (desktop, mobile, or Web Vault integration). The companion
+runs the full Bitwarden Rust SDK, authenticates, syncs, and decrypts the vault; it then
+pushes credentials to the device over the existing push path (HTTP on emulator, BLE/USB on
+real hardware). The device performs no TLS, HTTP, SDK, or cryptographic operations (except
+future HOTP/TOTP for FIDO2). This pragmatic delegation model unblocks M1–M2 with real vault
+data and zero embedded-crypto risk. A future **on-device first-class client** via a private
+SDK fork is the long-term vision, conditional on the portable-vault concept validating and
+deferred to epic `ai-bitwarden-hw-key-1sg`.
 
 **Hardware:** the Lilygo T-Embed (ESP32-S3, 320x170 color ST7789, rotary encoder,
 8MB PSRAM) is the **first concrete target, not the final form factor.** The UI and
@@ -59,12 +63,14 @@ Rebuild the foundation for a color display + rotary encoder, hardware-portable, 
 
 ### M1: Vault browse (portable vault, part 1)
 - Credential list + detail views designed for color + rotary encoder (Uma-led design).
-- Backed by the sync/storage layer (direction: direct server sync via SDK; fallback: pushed credentials).
+- Backed by companion-app push via `PushSyncSource` (real Bitwarden vault credentials).
+- Companion app (desktop/mobile/Web Vault) runs the SDK, decrypts, and pushes to device.
 - *Done when:* you can browse your real vault on the color device.
 
 ### M2: Type it (portable vault payoff)
 - Credential output over **USB HID and/or BLE HID** (USB the likely primary demo path:
   no pairing, reliable; BLE the cable-free story).
+- Companion app continues to push fresh vault data as needed.
 - Desktop simulation of typing for the emulated run modes.
 - *Done when:* unlock, browse, type a credential into a real login form, end to end. This is the demo.
 
@@ -79,15 +85,11 @@ Rebuild the foundation for a color display + rotary encoder, hardware-portable, 
 ## Open Questions & Risks
 
 ### Gating (M0)
-1. **Bitwarden Rust SDK on ESP32-S3 (feasibility spike).** [IN PROGRESS]
-   - Does the full dependency tree (async runtime, HTTP, TLS) link and fit within RAM + 8MB PSRAM?
-   - `reqwest`/`tokio` on ESP-IDF, and `rustls` vs ESP-IDF-native `mbedtls`.
-   - KDF cost: Argon2id memory params may exceed practical limits; PBKDF2 iteration
-     time. Unlock latency is the UX risk.
-   - **Mitigation to design in:** re-encode the vault key under a **session key**
-     protected by a faster algorithm, so only the first unlock pays full KDF cost.
-     Session-key support likely needs to be newly added (SDK and/or our layer).
-   - **Decision**: [2026-08-11-sync-source-abstraction.md](./decisions/2026-08-11-sync-source-abstraction.md) defers the final choice (SDK viable or fallback) to post-spike ADR. M0 proceeds with `PushSyncSource` (fallback) while spike runs in parallel (W8).
+1. **Bitwarden Rust SDK on ESP32-S3 (feasibility spike).** [RESOLVED = NO-GO]
+   - **Verdict**: SDK is infeasible on xtensa. ring's bundled C crypto links wrong-endian (C/LLVM level, no app-side fix); bitwarden-crypto unconditionally pulls full reqwest/rustls/ring/mockall stack via bitwarden-api-key-connector (no 'just KDF' seam).
+   - **Outcome**: Device uses `PushSyncSource` (companion-app push) for M0–M2. Companion runs the SDK on a capable platform (desktop/mobile/Web Vault).
+   - **Future direction**: On-device first-class SDK client via private fork deferred to epic `ai-bitwarden-hw-key-1sg` (conditional, only revived if portable-vault validates).
+   - **Decision**: [2026-08-11-sync-direction-companion-push.md](./decisions/2026-08-11-sync-direction-companion-push.md) (post-spike ADR). Related: [2026-08-11-sync-source-abstraction.md](./decisions/2026-08-11-sync-source-abstraction.md) (deferred the choice; this ADR resolves it).
 
 2. **UI framework: reuse vs rewrite vs OSS.** [RESOLVED]
    - **Decision**: [2026-08-11-ui-framework-reuse-vs-rewrite.md](./decisions/2026-08-11-ui-framework-reuse-vs-rewrite.md)
@@ -97,10 +99,8 @@ Rebuild the foundation for a color display + rotary encoder, hardware-portable, 
    - **Decision**: [2026-08-11-portability-boundary-and-workspace-split.md](./decisions/2026-08-11-portability-boundary-and-workspace-split.md)
    - **Verdict**: Three-layer Cargo workspace (`core` / `firmware` / `emulator`) with compiler-enforced boundaries. Platform traits (DisplaySurface, InputSource, Clock, Storage) defined in `core`; implementations in platform-specific crates. No custom HAL re-abstraction; use esp-idf-hal and ecosystem drivers directly.
 
-### Later
-4. **Companion app.** Managing the device from a computer is easier than a rotary
-   encoder (bulk edits, setup, debugging). Likely wanted eventually, but *not* the sync
-   trust anchor if direct server sync works, so not prioritized immediately. Scope TBD.
+### For M1–M2
+4. **Companion app (sync and credential push).** The companion app (desktop, mobile, or Web Vault integration) is the trust anchor: it runs the Bitwarden SDK, authenticates, syncs the vault, decrypts credentials, and pushes them to the device over the push path. Scope: initial companion implementation (CLI or simple desktop GUI for testing); full Web Vault integration may be deferred post-M2. **This is now the primary sync mechanism** (previously listed as "Later" and conditional; promoted by spike outcome).
 5. **FIDO2 UX** on color + encoder: PIN entry, user verification, multi-credential
    disambiguation. The new input model changes the design space.
 6. **Large vaults** (500+): browsing/search performance on-device.

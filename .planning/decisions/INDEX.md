@@ -12,6 +12,7 @@ Quick reference for all architectural and technical decisions made in this proje
 
 | Date | Title | Status | File |
 |------|-------|--------|------|
+| 2026-08-11 | Sync Direction: Companion-App Push (Near-Term) and Private-Fork Deferral (Long-Term) | Accepted | [2026-08-11-sync-direction-companion-push.md](2026-08-11-sync-direction-companion-push.md) |
 | 2026-08-11 | UI Framework: Retire Both Existing GUIs, Rewrite Clean on Embedded-Graphics | Accepted | [2026-08-11-ui-framework-reuse-vs-rewrite.md](2026-08-11-ui-framework-reuse-vs-rewrite.md) |
 | 2026-08-11 | Sync Source Abstraction and Deferred SDK Decision | Accepted | [2026-08-11-sync-source-abstraction.md](2026-08-11-sync-source-abstraction.md) |
 | 2026-08-11 | Rotary Encoder Input Model and Navigation Intent | Accepted | [2026-08-11-rotary-encoder-input-model.md](2026-08-11-rotary-encoder-input-model.md) |

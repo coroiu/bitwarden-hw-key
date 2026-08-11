@@ -1,6 +1,6 @@
 # Project Progress
 
-**Last Updated**: 2026-08-11 (Vision re-grounded, pivoting to M0 platform migration)
+**Last Updated**: 2026-08-11 (SDK spike NO-GO; pivoting to companion-app push model)
 
 ## Current Status
 The project vision has been re-grounded to focus on the Lilygo T-Embed (ESP32-S3, 320x170 color ST7789, rotary encoder) as the first concrete target. The old 128x32 mono OLED prototype work is complete but treated as throwaway pending a green-field GUI redesign. Current focus: **M0 (Platform Migration)**, which has not started yet. M0 will be run as a beads epic and includes architect-led UI framework design, formalization of the three run modes (headless, windowed, real-target), and an SDK feasibility spike.
@@ -81,6 +81,25 @@ Historical work from the initial Adafruit HUZZAH32 prototype. Treated as throwaw
 - Basic GUI component system
 
 ## In Progress
+
+### SDK Spike Closure and Sync Direction Pivot (2026-08-11)
+
+**Spike bead `ai-bitwarden-hw-key-8d7.2` (closed)** returned a definitive NO-GO for on-device Bitwarden Rust SDK sync on ESP32-S3:
+- **ring's bundled C crypto links wrong-endian on xtensa** (C/LLVM level, no application-side fix; insurmountable).
+- **bitwarden-crypto unconditionally pulls reqwest/rustls/ring/mockall stack** via bitwarden-api-key-connector; no feature-gated KDF-only seam.
+- Compilation made to work with workarounds (`ring`'s `less-safe-getrandom-espidf`, `opt-level=0`), but link wall is fatal.
+
+**Decision Pivot**: Device adopts **companion-app push model** for M0–M2 validation. A trusted companion app (desktop, mobile, or Web Vault) runs the full Bitwarden SDK, authenticates, syncs, and decrypts; it then pushes credentials to the device via `PushSyncSource`. Device is a secure display + HID peripheral (no SDK, TLS, HTTP, or crypto operations).
+
+**Deferred**: On-device first-class SDK client via private fork of Bitwarden crates (epic `ai-bitwarden-hw-key-1sg`, conditional, only revived if portable-vault validates and business case holds).
+
+**ADRs recorded**: 
+- [2026-08-11-sync-direction-companion-push.md](./decisions/2026-08-11-sync-direction-companion-push.md) (post-spike decision; resolves the deferral from sync-source-abstraction ADR)
+- Updated: [2026-08-11-sync-source-abstraction.md](./decisions/2026-08-11-sync-source-abstraction.md) (added post-spike update note)
+
+**Impact on M0–M2**: Unblocked. M1 can proceed with real vault data via companion push. No embedded-crypto risk. Companion app scope: initial CLI or simple desktop GUI for testing; full Web Vault integration deferred post-M2.
+
+---
 
 ### M0 (Platform Migration): Design Complete, Foundation Implementation Underway
 
