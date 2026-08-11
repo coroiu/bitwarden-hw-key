@@ -1,0 +1,48 @@
+[package]
+name = "firmware"
+version = "0.1.0"
+authors = ["Andreas Coroiu <andreas.coroiu@gmail.com>"]
+edition = "2021"
+rust-version = "1.77"
+
+# This crate only ever targets xtensa-esp32-espidf (see the workspace-root
+# .cargo/config.toml default and rust-toolchain.toml). Unlike the old
+# single-crate setup, dependencies here don't need `cfg(target_arch =
+# "xtensa")` gating: this package IS the ESP32 side of the portability
+# split, so esp-idf-hal/esp-idf-svc are unconditional dependencies. `cargo
+# build --bin desktop` / `-p emulator` never touches this package's
+# dependency graph at all.
+
+[features]
+default = ["std", "esp-idf-svc/native"]
+
+pio = ["esp-idf-svc/pio"]
+std = ["alloc", "esp-idf-svc/binstart", "esp-idf-svc/std"]
+alloc = ["esp-idf-svc/alloc"]
+nightly = ["esp-idf-svc/nightly"]
+experimental = ["esp-idf-svc/experimental"]
+embassy = [
+  "esp-idf-svc/embassy-sync",
+  "esp-idf-svc/critical-section",
+  "esp-idf-svc/embassy-time-driver",
+]
+
+[dependencies]
+bhk-core = { path = "../core" }
+log = { version = "0.4", default-features = false }
+once_cell = "1.19.0"
+uuid = { version = "1.8.0", features = ["v4"] }
+embedded-graphics-core = "0.4.0"
+embedded-graphics = "0.8.1"
+esp-idf-svc = { version = "0.51", default-features = false }
+esp-idf-hal = "0.45"
+ssd1306 = "0.8.4"
+button-driver = { version = "0.2", features = ["esp", "std"] }
+
+[build-dependencies]
+embuild = { version = "0.33", features = ["espidf"] }
+build-target = "0.8.0"
+
+[[bin]]
+name = "esp32"
+path = "src/main.rs"

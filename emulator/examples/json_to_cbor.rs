@@ -1,4 +1,4 @@
-use bitwarden_hw_key::credentials::SyncRequest;
+use emulator::credentials::SyncRequest;
 use std::fs;
 
 fn main() {

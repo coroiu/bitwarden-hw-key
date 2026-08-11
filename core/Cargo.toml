@@ -1,0 +1,19 @@
+[package]
+name = "bhk-core"
+version = "0.1.0"
+authors = ["Andreas Coroiu <andreas.coroiu@gmail.com>"]
+edition = "2021"
+rust-version = "1.77"
+
+# Platform-free application core. This crate MUST NOT depend on esp-idf-*,
+# minifb, tiny_http, ssd1306, or any other platform-specific crate. That
+# constraint is enforced by the absence of such dependencies below, not by
+# convention: if a platform crate ever creeps in here, both `firmware` and
+# `emulator` still build against this same code, so drift becomes visible
+# immediately instead of failing silently on one target.
+#
+# See: .planning/decisions/2026-08-11-portability-boundary-and-workspace-split.md
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "1.8.0", features = ["v4"] }
