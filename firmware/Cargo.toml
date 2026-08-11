@@ -36,8 +36,30 @@ embedded-graphics-core = "0.4.0"
 embedded-graphics = "0.8.1"
 esp-idf-svc = { version = "0.51", default-features = false }
 esp-idf-hal = "0.45"
+# `embedded_svc::storage::RawStorage` (get_raw/set_raw/len) is what
+# `board::nvs_storage::NvsStorage` uses against `EspNvs`. Pinned to the
+# same 0.28 esp-idf-svc 0.51 already depends on, so Cargo resolves both
+# to the same crate instance instead of two incompatible trait copies.
+embedded-svc = { version = "0.28", default-features = false }
+# T-Embed (ESP32-S3) board adapter, W6: real ST7789 panel driver and
+# rotary-encoder quadrature decoder. See `board/` for the trait impls.
+mipidsi = "0.10"
+rotary-encoder-hal = "0.6"
+# Old HUZZAH32 (plain ESP32) prototype: SSD1306 OLED + 3-button GPIO
+# input. Kept only until the T-Embed board adapter has proven parity in
+# the unified main loop (W7), per the M0 epic; not used by `board/`.
 ssd1306 = "0.8.4"
-button-driver = { version = "0.2", features = ["esp", "std"] }
+# `board::rotary_input` reuses this for the encoder's push-button
+# (debounce/click/long-press) instead of hand-rolling it again. The
+# original `esp_input.rs` enabled only "esp"/"std" and worked around the
+# missing blanket `PinWrapper` impl with its own `MyPinWrapper` + `Box<dyn
+# _>` boilerplate (see that file) — "esp" only pulls in the `embedded-hal`
+# dependency, it does not gate button-driver's `impl<P: InputPin>
+# PinWrapper for P` (that's behind the separate "embedded_hal" feature
+# name). Adding "embedded_hal" here lets `board::rotary_input` use
+# `esp_idf_hal::gpio::PinDriver` directly as a `PinWrapper` with no
+# wrapper type.
+button-driver = { version = "0.2", features = ["esp", "std", "embedded_hal"] }
 
 [build-dependencies]
 embuild = { version = "0.33", features = ["espidf"] }
