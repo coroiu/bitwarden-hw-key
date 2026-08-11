@@ -5,21 +5,28 @@
 //! platform-specific crate (see `Cargo.toml`). `firmware` and `emulator`
 //! both depend on this crate and implement its trait seams.
 //!
-//! Current contents are intentionally minimal (W2, this bead):
+//! Current contents:
 //! - [`vault_item::VaultItem`]: the credential view-model, migrated out of
 //!   the old single-crate `credentials` module.
-//! - [`input`], [`platform`], [`sync_source`]: placeholder trait/enum
-//!   seams per the accepted ADRs, with no implementations yet.
+//! - [`input`]: the frozen `NavIntent` semantic input vocabulary (W1).
+//! - [`platform`]: the `DisplaySurface`/`InputSource`/`Clock`/`Storage`/
+//!   `Platform` trait seams (W1), with no implementations yet.
+//! - [`sync_source`]: placeholder trait seam per the accepted ADR, no
+//!   implementation yet.
+//! - [`render`]: the render core (W3, this bead) — `FrameBuffer565`,
+//!   `Widget`/`Action`/`FocusEvent`, `Screen`/`Navigator`, chrome layout,
+//!   and the `VerticalList` widget.
 //!
 //! The old GUI rendering engines (`gui`/`simple_gui`) are NOT here — they
-//! still live, duplicated, in `firmware` and `emulator` until W3 replaces
-//! them with a real render core (built here) and W7 deletes the old
-//! engines entirely.
+//! still live, duplicated, in `firmware` and `emulator` until W7 deletes
+//! them entirely (this bead builds their replacement but does not wire it
+//! up to either binary yet — that's the unified main loop, also W7).
 //!
 //! See: .planning/decisions/2026-08-11-portability-boundary-and-workspace-split.md
 
 pub mod input;
 pub mod platform;
+pub mod render;
 pub mod sync_source;
 pub mod vault_item;
 
