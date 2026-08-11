@@ -30,7 +30,14 @@ const NVS_MAX_KEY_LEN: usize = 15;
 /// (the core trait returns a bare `Option`, not a `Result` — frozen in
 /// W1), so a failed read is logged and treated as "key absent" instead;
 /// this type only covers the fallible write path.
+///
+/// `#[allow(dead_code)]`: `Esp`'s inner `EspError` is read only through
+/// the derived `Debug` impl (whatever eventually logs/panics on a write
+/// failure), which `rustc`'s dead-code analysis deliberately doesn't
+/// count as a "real" read of the field — see the identical situation and
+/// note on `St7789SurfaceError`/`St7789SurfaceInitError`.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum NvsStorageError {
     /// The key is longer than NVS's 15-byte limit.
     KeyTooLong,

@@ -5,13 +5,13 @@ authors = ["Andreas Coroiu <andreas.coroiu@gmail.com>"]
 edition = "2021"
 rust-version = "1.77"
 
-# This crate only ever targets xtensa-esp32-espidf (see the workspace-root
-# .cargo/config.toml default and rust-toolchain.toml). Unlike the old
-# single-crate setup, dependencies here don't need `cfg(target_arch =
-# "xtensa")` gating: this package IS the ESP32 side of the portability
-# split, so esp-idf-hal/esp-idf-svc are unconditional dependencies. `cargo
-# build --bin desktop` / `-p emulator` never touches this package's
-# dependency graph at all.
+# This crate only ever targets xtensa-esp32s3-espidf (the Lilygo T-Embed;
+# see the workspace-root .cargo/config.toml default and
+# rust-toolchain.toml). Unlike the old single-crate setup, dependencies
+# here don't need `cfg(target_arch = "xtensa")` gating: this package IS
+# the ESP32-S3 side of the portability split, so esp-idf-hal/esp-idf-svc
+# are unconditional dependencies. `cargo build --bin desktop` / `-p
+# emulator` never touches this package's dependency graph at all.
 
 [features]
 default = ["std", "esp-idf-svc/native"]
@@ -30,9 +30,6 @@ embassy = [
 [dependencies]
 bhk-core = { path = "../core" }
 log = { version = "0.4", default-features = false }
-once_cell = "1.19.0"
-uuid = { version = "1.8.0", features = ["v4"] }
-embedded-graphics-core = "0.4.0"
 embedded-graphics = "0.8.1"
 esp-idf-svc = { version = "0.51", default-features = false }
 esp-idf-hal = "0.45"
@@ -45,10 +42,6 @@ embedded-svc = { version = "0.28", default-features = false }
 # rotary-encoder quadrature decoder. See `board/` for the trait impls.
 mipidsi = "0.10"
 rotary-encoder-hal = "0.6"
-# Old HUZZAH32 (plain ESP32) prototype: SSD1306 OLED + 3-button GPIO
-# input. Kept only until the T-Embed board adapter has proven parity in
-# the unified main loop (W7), per the M0 epic; not used by `board/`.
-ssd1306 = "0.8.4"
 # `board::rotary_input` reuses this for the encoder's push-button
 # (debounce/click/long-press) instead of hand-rolling it again. The
 # original `esp_input.rs` enabled only "esp"/"std" and worked around the

@@ -12,7 +12,10 @@
 
 use std::convert::Infallible;
 
+use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::OriginDimensions;
+use embedded_graphics::pixelcolor::Rgb565;
+use embedded_graphics::prelude::RgbColor;
 
 use super::chrome::compute_chrome;
 use super::framebuffer::FrameBuffer565;
@@ -124,12 +127,24 @@ impl Navigator {
     /// Renders the current screen into `target`, computing chrome regions
     /// from whatever size `target` happens to be.
     ///
+    /// Clears `target` to black first. This matters because, per the
+    /// presentation-surface ADR, the app core owns a single long-lived
+    /// framebuffer that gets re-rendered into every frame rather than
+    /// reallocated — without an explicit clear, a widget that doesn't
+    /// unconditionally repaint every pixel of its area (e.g.
+    /// `VerticalList` only fills a *selected* row's background, leaving
+    /// unselected rows' backgrounds untouched) would leave stale pixels
+    /// from a previous frame's selection highlight visible after the
+    /// selection moves away. Widgets and tests that always render into a
+    /// fresh `FrameBuffer565` (already black) are unaffected by this.
+    ///
     /// # Errors
     ///
     /// Never, in practice: `FrameBuffer565`'s `DrawTarget::Error` is
     /// `Infallible`. The `Result` return exists so this can use `?`
     /// against embedded-graphics `Drawable::draw` calls internally.
     pub fn render(&self, target: &mut FrameBuffer565) -> Result<(), Infallible> {
+        target.clear(Rgb565::BLACK)?;
         let chrome = compute_chrome(target.size());
         self.current().render(&chrome, target)
     }
@@ -139,8 +154,8 @@ impl Navigator {
 mod tests {
     use super::*;
     use crate::render::list::{ListItem, VerticalList};
-    use embedded_graphics::pixelcolor::Rgb565;
-    use embedded_graphics::prelude::{OriginDimensions, RgbColor, Size};
+    use embedded_graphics::pixelcolor::{Rgb565, WebColors};
+    use embedded_graphics::prelude::{OriginDimensions, Point, RgbColor, Size};
 
     fn list_screen(title: &str, n: usize) -> Screen {
         let items = (0..n).map(|i| ListItem::new(format!("{title}-item-{i}"))).collect();
@@ -226,6 +241,32 @@ mod tests {
         // push. This is the "per-screen focus memory" requirement.
         assert_eq!(nav.current().focused_index(), Some(0));
         assert_eq!(nav.current().title, "root");
+    }
+
+    #[test]
+    fn rendering_into_the_same_framebuffer_twice_does_not_leave_the_previous_frames_selection_highlight_behind() {
+        // Regression test for the "reused framebuffer across frames"
+        // ghosting bug: `render()` used to skip clearing, so a row's
+        // selection-highlight fill from frame N was still visible in
+        // frame N+1 after the selection moved away (`VerticalList` only
+        // paints a background fill for the *currently* selected row, not
+        // every row). This is exactly the scenario `App`/the unified run
+        // loop hit in practice, since they render into one long-lived
+        // `FrameBuffer565` rather than allocating a fresh one per frame.
+        let mut fb = FrameBuffer565::new(320, 170);
+        let mut nav = Navigator::new(list_screen("Vault", 3));
+
+        nav.render(&mut fb).unwrap();
+        let row0_highlighted = fb.pixel(Point::new(2, 18));
+        assert_eq!(row0_highlighted, Rgb565::CSS_DARK_SLATE_BLUE, "row 0 starts selected");
+
+        nav.dispatch(NavIntent::Next);
+        nav.render(&mut fb).unwrap();
+        let row0_after_move = fb.pixel(Point::new(2, 18));
+        assert_ne!(
+            row0_after_move, Rgb565::CSS_DARK_SLATE_BLUE,
+            "row 0's stale highlight from the first render must not survive into the second"
+        );
     }
 
     #[test]
