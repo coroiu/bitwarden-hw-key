@@ -11,8 +11,11 @@
 //! - [`input`]: the frozen `NavIntent` semantic input vocabulary (W1).
 //! - [`platform`]: the `DisplaySurface`/`InputSource`/`Clock`/`Storage`/
 //!   `Platform` trait seams (W1), with no implementations yet.
-//! - [`sync_source`]: placeholder trait seam per the accepted ADR, no
-//!   implementation yet.
+//! - [`sync_source::SyncSource`]: the `sync() -> Vec<VaultItem>` trait
+//!   seam (W9). `PushSyncSource` (the concrete impl wrapping the HTTP+CBOR
+//!   push protocol) lives in `emulator::desktop`, not here — this crate
+//!   only defines the seam. See the module docs for why the trait has no
+//!   `unlock()`, unlike the original ADR sketch.
 //! - [`render`]: the render core (W3, this bead) — `FrameBuffer565`,
 //!   `Widget`/`Action`/`FocusEvent`, `Screen`/`Navigator`, chrome layout,
 //!   and the `VerticalList` widget.
@@ -31,5 +34,5 @@ pub mod sync_source;
 pub mod vault_item;
 
 pub use input::NavIntent;
-pub use sync_source::{SyncSource, UnlockToken};
+pub use sync_source::SyncSource;
 pub use vault_item::VaultItem;
