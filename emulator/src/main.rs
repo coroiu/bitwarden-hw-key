@@ -1,34 +1,82 @@
-use bhk_core::VaultItem;
-use emulator::desktop::{DesktopInput, DesktopStorage, SyncServer};
-use emulator::{simple_gui, simple_view};
-use minifb::{Window, WindowOptions};
+//! The `desktop` binary: the emulator entry point for the two host run
+//! modes (windowed, headless) per
+//! `.planning/decisions/2026-08-11-three-mode-testability.md`. Both modes
+//! share the exact same `bhk_core::App` + `bhk_core::run` loop; they differ
+//! only in which concrete `DisplaySurface`/`InputSource` they hand to a
+//! `platform::HostPlatform` (see the presentation-surface ADR).
+//!
+//! Replaces the old 128x32 `simple_gui` pipeline this file used to run
+//! directly (retired in W7 — see `lib.rs`).
+//!
+//! # Usage
+//!
+//! Windowed (default): `cargo run --bin desktop --target <host-triple>`
+//!
+//! Headless: `cargo run --bin desktop --target <host-triple> -- --headless
+//! [--dump-png PATH] [--frames N]`. `--dump-png` writes the framebuffer as
+//! a PNG after `N` frames (default 1) and exits — the fast path for
+//! automated/agent verification. Without `--dump-png`, headless mode just
+//! runs the loop indefinitely (there is no headless input yet — the HTTP
+//! `NavIntent` injection + screenshot protocol is bead W5 — but the
+//! `InputSource` seam is already there for W5 to plug into: see
+//! `platform::NoopInput`).
+//!
+//! The HTTP push server (`POST /api/sync`, `/api/status`, `/api/clear`,
+//! `/api/shutdown`) keeps running in both modes exactly as before — it's
+//! how a companion (or `curl`, or the Web Vault dev harness) gets
+//! credentials onto the device; `PushSyncSource` wraps it as the app's
+//! `SyncSource`.
+
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-const WIDTH: usize = 128;
-const HEIGHT: usize = 32;
-const SCALE: usize = 8;
-const WINDOW_WIDTH: usize = WIDTH * SCALE;
-const WINDOW_HEIGHT: usize = HEIGHT * SCALE;
+use bhk_core::platform::Platform;
+use bhk_core::{run, App, SyncSource};
+use emulator::desktop::{DesktopStorage, PushSyncSource, SyncServer};
+use emulator::platform::{FileStorage, HeadlessSurface, HostPlatform, MinifbSurface, NoopInput, WindowedInput};
+use minifb::{Window, WindowOptions};
+
+const WIDTH: u32 = 320;
+const HEIGHT: u32 = 170;
+const WINDOW_SCALE: u32 = 3;
+/// ~30fps: generous for a credential list (no animation), light on CPU for
+/// a background/agent-driven headless run.
+const FRAME_BUDGET: Duration = Duration::from_millis(33);
+
+struct Args {
+    headless: bool,
+    dump_png: Option<String>,
+    frames: u32,
+}
+
+fn parse_args() -> Args {
+    let raw: Vec<String> = std::env::args().collect();
+    let headless = raw.iter().any(|a| a == "--headless");
+    let dump_png = raw
+        .iter()
+        .position(|a| a == "--dump-png")
+        .and_then(|i| raw.get(i + 1))
+        .cloned();
+    let frames = raw
+        .iter()
+        .position(|a| a == "--frames")
+        .and_then(|i| raw.get(i + 1))
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1);
+    Args { headless, dump_png, frames }
+}
 
 fn main() {
-    println!("Starting desktop emulator...");
-    println!("Controls: Arrow Up/Down, Space (Middle button)");
-    println!(
-        "Window size: {}x{} ({}x scale)",
-        WINDOW_WIDTH, WINDOW_HEIGHT, SCALE
-    );
+    let args = parse_args();
 
-    // Create storage
-    let storage = Arc::new(Mutex::new(
-        DesktopStorage::new().expect("Failed to create storage"),
-    ));
+    println!("Starting desktop emulator ({} mode)...", if args.headless { "headless" } else { "windowed" });
 
-    // Start HTTP server in background thread
-    let server = SyncServer::new("127.0.0.1:8080", storage.clone())
-        .expect("Failed to start HTTP server");
-    let credentials = server.get_credentials_ref();
+    let storage_backend = Arc::new(Mutex::new(DesktopStorage::new().expect("Failed to create credential storage")));
+    let server = SyncServer::new("127.0.0.1:8080", storage_backend).expect("Failed to start HTTP server");
+    let credentials_ref = server.get_credentials_ref();
     let shutdown_signal = server.get_shutdown_signal();
 
     std::thread::spawn(move || {
@@ -40,145 +88,80 @@ fn main() {
         println!("  POST /api/shutdown - Shutdown emulator");
         loop {
             if let Err(e) = server.handle_request() {
-                eprintln!("HTTP server error: {}", e);
+                eprintln!("HTTP server error: {e}");
             }
         }
     });
 
-    // Create window
-    let mut window = Window::new(
-        "Bitwarden HW Key - Desktop Emulator",
-        WINDOW_WIDTH,
-        WINDOW_HEIGHT,
-        WindowOptions::default(),
-    )
-    .unwrap_or_else(|e| {
-        panic!("Unable to create window: {}", e);
-    });
+    let kv_storage = FileStorage::new_default().expect("Failed to open kv store");
+    let mut sync_source = PushSyncSource::new(credentials_ref);
+    let initial_items = sync_source.sync().expect("PushSyncSource::sync is Infallible");
 
-    // Limit to 60 fps
-    window.set_target_fps(60);
+    let mut app = App::new(WIDTH, HEIGHT, initial_items);
 
-    // Create input handler
-    let mut input = DesktopInput::new();
-
-    // Create document with initial credentials. The render layer speaks
-    // `VaultItem` (core view-model); the HTTP/storage layer speaks
-    // `Credential` (wire format). Convert at this boundary.
-    let initial_creds = credentials.lock().unwrap().clone();
-    let initial_vault_items: Vec<VaultItem> = initial_creds.iter().map(VaultItem::from).collect();
-    let mut document = simple_view::create_credential_list_view(
-        &initial_vault_items,
-        WIDTH as u32,
-        HEIGHT as u32,
-    );
-    let mut canvas = simple_gui::Canvas::new(WIDTH, HEIGHT);
-
-    // Initialize focus on first focusable component
-    document.initialize_focus();
-
-    // Track credential changes
-    let mut last_cred_count = initial_creds.len();
-
-    // Timing
-    let mut last_update = Instant::now();
-    let mut last_draw = Instant::now();
-    let update_interval = Duration::from_millis(25); // 40 fps update rate
-    let draw_interval = Duration::from_millis(16); // ~60 fps draw rate
-
-    // Initial render
-    document.update();
-    document.layout();
-    document.draw(&mut canvas);
-
-    // Frame buffer for minifb (scaled)
-    let mut frame_buffer: Vec<u32> = vec![0; WINDOW_WIDTH * WINDOW_HEIGHT];
-
-    println!("Emulator started!");
-
-    while window.is_open() {
-        let now = Instant::now();
-
-        // Check for shutdown signal from HTTP server
-        if shutdown_signal.load(Ordering::Relaxed) {
-            println!("Shutdown requested via HTTP API");
-            break;
-        }
-
-        // Check for new credentials from HTTP server
-        {
-            let creds = credentials.lock().unwrap();
-            if creds.len() != last_cred_count {
-                println!(
-                    "Credentials updated: {} → {} credentials",
-                    last_cred_count,
-                    creds.len()
-                );
-                last_cred_count = creds.len();
-
-                // Recreate document with updated credentials
-                // This clears the navigation stack and shows the list view
-                let vault_items: Vec<VaultItem> = creds.iter().map(VaultItem::from).collect();
-                document = simple_view::create_credential_list_view(
-                    &vault_items,
-                    WIDTH as u32,
-                    HEIGHT as u32,
-                );
-                document.initialize_focus();
-            }
-        }
-
-        // Process input - navigation is now handled by Document's view stack
-        input.process_window(&window);
-        document.handle_input(&mut input);
-
-        // Update at ~40 fps
-        if now.duration_since(last_update) >= update_interval {
-            document.update();
-            document.layout();
-            last_update = now;
-        }
-
-        // Draw at ~60 fps
-        if now.duration_since(last_draw) >= draw_interval {
-            canvas.clear();
-            document.draw(&mut canvas);
-
-            // Convert canvas to frame buffer with 8x scaling
-            convert_canvas_to_framebuffer(&canvas, &mut frame_buffer);
-
-            // Update window
-            window
-                .update_with_buffer(&frame_buffer, WINDOW_WIDTH, WINDOW_HEIGHT)
-                .unwrap();
-
-            last_draw = now;
-        }
+    if args.headless {
+        run_headless(&mut app, &mut sync_source, kv_storage, &shutdown_signal, &args);
+    } else {
+        run_windowed(&mut app, &mut sync_source, kv_storage, &shutdown_signal);
     }
 
     println!("Emulator closed.");
 }
 
-fn convert_canvas_to_framebuffer(canvas: &simple_gui::Canvas, frame_buffer: &mut [u32]) {
-    let pixels = &canvas.image_buffer.pixels;
+fn run_headless(
+    app: &mut App,
+    sync_source: &mut PushSyncSource,
+    storage: FileStorage,
+    shutdown_signal: &Arc<std::sync::atomic::AtomicBool>,
+    args: &Args,
+) {
+    let mut platform = HostPlatform::new(HeadlessSurface::new(), NoopInput::new(), storage);
 
-    for y in 0..HEIGHT {
-        for x in 0..WIDTH {
-            let pixel_index = x + y * WIDTH;
-            let color = pixels[pixel_index];
-
-            // Convert RGB to u32 format (0xRRGGBB)
-            let rgb = ((color.r as u32) << 16) | ((color.g as u32) << 8) | (color.b as u32);
-
-            // Write scaled pixel (8x8 block)
-            for sy in 0..SCALE {
-                for sx in 0..SCALE {
-                    let scaled_x = x * SCALE + sx;
-                    let scaled_y = y * SCALE + sy;
-                    let scaled_index = scaled_x + scaled_y * WINDOW_WIDTH;
-                    frame_buffer[scaled_index] = rgb;
-                }
-            }
-        }
+    if let Some(path) = &args.dump_png {
+        // Bounded run for automated/agent verification: N frames, then dump
+        // and exit, rather than idling forever waiting for input that (until
+        // W5's HTTP injection lands) will never arrive in this mode.
+        let mut frame = 0u32;
+        run(&mut platform, app, sync_source, FRAME_BUDGET, || {
+            frame += 1;
+            frame <= args.frames
+        });
+        platform.display().save_png(path).expect("failed to save headless PNG");
+        println!("Wrote headless screenshot to {path} ({WIDTH}x{HEIGHT}, {} frame(s))", args.frames);
+    } else {
+        println!("Headless mode running (no --dump-png given; running until HTTP shutdown).");
+        println!("Real headless input (HTTP NavIntent injection) lands in bead W5; this run mode currently only observes SyncSource updates.");
+        run(&mut platform, app, sync_source, FRAME_BUDGET, || !shutdown_signal.load(Ordering::Relaxed));
     }
+}
+
+fn run_windowed(
+    app: &mut App,
+    sync_source: &mut PushSyncSource,
+    storage: FileStorage,
+    shutdown_signal: &Arc<std::sync::atomic::AtomicBool>,
+) {
+    println!("Controls: Arrow Up/Down (Prev/Next), Enter (Activate), Backspace/Esc (Back)");
+    println!("Window size: {}x{} ({WINDOW_SCALE}x scale)", WIDTH * WINDOW_SCALE, HEIGHT * WINDOW_SCALE);
+
+    let mut window = Window::new(
+        "Bitwarden HW Key - Desktop Emulator",
+        (WIDTH * WINDOW_SCALE) as usize,
+        (HEIGHT * WINDOW_SCALE) as usize,
+        WindowOptions::default(),
+    )
+    .unwrap_or_else(|e| panic!("Unable to create window: {e}"));
+    window.set_target_fps(60);
+    let window = Rc::new(RefCell::new(window));
+
+    let display = MinifbSurface::new(Rc::clone(&window), WIDTH, HEIGHT, WINDOW_SCALE);
+    let input = WindowedInput::new(Rc::clone(&window));
+    let mut platform = HostPlatform::new(display, input, storage);
+
+    println!("Emulator started!");
+
+    let window_for_should_continue = Rc::clone(&window);
+    run(&mut platform, app, sync_source, FRAME_BUDGET, || {
+        window_for_should_continue.borrow().is_open() && !shutdown_signal.load(Ordering::Relaxed)
+    });
 }
