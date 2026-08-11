@@ -1,24 +1,22 @@
 //! Platform capability bundle: the four traits the app core is injected
 //! with (`DisplaySurface`, `InputSource`, `Clock`, `Storage`), per the
-//! presentation-surface ADR. This module is a **placeholder seam only**:
-//! trait shapes are frozen here so `firmware` and `emulator` have a shared
-//! contract to build against, but no implementations exist yet (host
-//! surfaces land in W4, the T-Embed board adapter in W6) and the render
-//! core itself is not built here (W3).
+//! presentation-surface ADR, plus the [`Platform`] trait that groups them.
+//! This module is a **trait-seam placeholder**: shapes are frozen here so
+//! `firmware` and `emulator` have a shared contract to build against, but
+//! no implementations exist yet (host surfaces land in W4, the T-Embed
+//! board adapter in W6).
+//!
+//! The render core itself — including the real [`FrameBuffer565`]
+//! definition `DisplaySurface::flush` refers to — lives in
+//! `crate::render` (built in W3, this bead); it's re-exported here only so
+//! this module's signatures stay meaningful without a second definition.
 //!
 //! See: .planning/decisions/2026-08-11-presentation-surface-run-mode-seam.md
 
 use crate::input::NavIntent;
 use std::time::Instant;
 
-/// Placeholder for the canonical Rgb565 framebuffer the app core will own
-/// and render into. Real definition (backing storage, pixel access,
-/// `DrawTarget` impl) lands with the render core in W3; this stub exists
-/// only so `DisplaySurface` has a concrete signature today.
-#[derive(Debug, Default)]
-pub struct FrameBuffer565 {
-    _placeholder: (),
-}
+pub use crate::render::FrameBuffer565;
 
 /// Transfers the shared framebuffer to a physical or virtual display.
 /// Implementations: headless (PNG capture), windowed (minifb), real-target
@@ -61,4 +59,24 @@ pub trait Storage {
     /// Returns `Self::Error` if the value could not be persisted (e.g. an
     /// NVS write failure on real hardware, or a filesystem error on host).
     fn set(&mut self, key: &str, value: Vec<u8>) -> Result<(), Self::Error>;
+}
+
+/// Capability bundle: groups the four injected platform traits behind a
+/// single generic parameter, so app-wiring code (the unified main loop,
+/// W7) can be generic over "a platform" instead of threading four separate
+/// type parameters through every function signature.
+///
+/// **Definition only.** No concrete `Platform` implementation exists yet —
+/// those are assembled once the headless/windowed surfaces (W4) and the
+/// T-Embed board adapter (W6) exist.
+pub trait Platform {
+    type Display: DisplaySurface;
+    type Input: InputSource;
+    type Clock: Clock;
+    type Storage: Storage;
+
+    fn display(&mut self) -> &mut Self::Display;
+    fn input(&mut self) -> &mut Self::Input;
+    fn clock(&self) -> &Self::Clock;
+    fn storage(&mut self) -> &mut Self::Storage;
 }
