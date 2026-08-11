@@ -14,6 +14,8 @@ Quick reference for all research conducted for this project.
 | Date | Topic | Status | File |
 |------|-------|--------|------|
 | 2026-01-22 | ESP32 NVS Storage and BLE HID Keyboard | Complete | [2026-01-22-esp32-nvs-and-ble-hid.md](2026-01-22-esp32-nvs-and-ble-hid.md) |
+| 2026-08-11 | UI Framework Survey: Custom Rasterizer vs. Embedded-Graphics | Complete | [2026-08-11-ui-framework-survey.md](2026-08-11-ui-framework-survey.md) |
+| 2026-08-11 | M0 Architecture Design: Platform Abstraction and Workspace Boundary | Complete | [2026-08-11-m0-architecture-design.md](2026-08-11-m0-architecture-design.md) |
 
 ## Research Categories
 

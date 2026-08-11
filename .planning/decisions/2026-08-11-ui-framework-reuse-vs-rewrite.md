@@ -146,4 +146,5 @@ If hand-rolled linear layout proves insufficient for future views (M1+), the esc
 
 - Owners: Fern (fe-architect), Ruby (rust-embedded-supervisor), Tess (tester)
 - Related decisions: [2026-08-11-presentation-surface-run-mode-seam.md](2026-08-11-presentation-surface-run-mode-seam.md), [2026-08-11-portability-boundary-and-workspace-split.md](2026-08-11-portability-boundary-and-workspace-split.md), [2026-01-21-focus-management-system.md](2026-01-21-focus-management-system.md) (concepts retained)
+- Research: [2026-08-11-ui-framework-survey.md](../../.research/findings/2026-08-11-ui-framework-survey.md) — Full analysis of existing engines, OSS survey, and design rationale
 - Roadmap Open Question 2 (answered by this decision)

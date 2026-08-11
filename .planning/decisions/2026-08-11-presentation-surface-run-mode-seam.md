@@ -89,3 +89,4 @@ The core's `DrawTarget` is bound to `Error = Infallible` (only `draw()` ops can 
 - Owners: Fern (fe-architect), Ruby (rust-embedded-supervisor), Tess (tester)
 - Related decisions: [2026-08-11-three-mode-testability.md](2026-08-11-three-mode-testability.md)
 - Related: [2026-01-21-desktop-emulation.md](2026-01-21-desktop-emulation.md)
+- Research: [2026-08-11-m0-architecture-design.md](../../.research/findings/2026-08-11-m0-architecture-design.md) — Platform abstraction design, three-surface implementation details, and Rgb565 canonical rationale
