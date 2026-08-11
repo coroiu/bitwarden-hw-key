@@ -1,3 +1,4 @@
+mod board;
 mod esp_input;
 mod gui;
 pub mod simple_gui;
@@ -47,9 +48,22 @@ fn main() -> Result<(), EspError> {
     led.set_high()?; // Indicate program start phase
 
     // OLED Display
+    //
+    // TODO(W7): this whole `main.rs` is the old HUZZAH32 (plain ESP32)
+    // prototype wiring (SSD1306 over I2C + 3-button GPIO input) and is
+    // superseded by the T-Embed `board` module (ST7789/rotary-encoder,
+    // see W6) plus the unified Platform-generic main loop (W7 deletes
+    // this file's old-engine wiring). GPIO22/GPIO23 (the original
+    // HUZZAH32 I2C pins) do not exist on the ESP32-S3 — the chip has no
+    // GPIO22-25 at all — so they only had to be remapped to *some* valid
+    // S3 GPIOs to keep this legacy binary compiling under the W6 target
+    // switch to xtensa-esp32s3-espidf. These pins are arbitrary and do
+    // not reflect the T-Embed's real display wiring (see
+    // `board::board_config` for that); this SSD1306 code will never run
+    // against real T-Embed hardware.
     let i2c = peripherals.i2c1;
-    let sda = peripherals.pins.gpio23;
-    let scl = peripherals.pins.gpio22;
+    let sda = peripherals.pins.gpio8;
+    let scl = peripherals.pins.gpio9;
 
     log::info!("Connecting to OLED");
 
