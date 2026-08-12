@@ -71,6 +71,41 @@ bitwarden-crypto = { git = "https://github.com/bitwarden/sdk-internal", rev = "9
 # semver-compatible 0.1 release would produce an identical expansion.
 async-trait = "0.1"
 
+# CBOR-encodes the outbound `push_protocol::SyncRequest` body in
+# `crate::transport::HttpEmulatorTransport::push` (ai-bitwarden-hw-key-eml.5)
+# -- the same wire format the retired `companion` binary used and the
+# emulator's `/api/sync` (`ciborium::from_reader`) still expects. Already
+# resolved transitively (push-protocol depends on it); named directly here
+# since this crate's own code calls `ciborium::into_writer`.
+ciborium = "0.2"
+
+# Async HTTP client for `crate::transport::HttpEmulatorTransport::push`
+# (ai-bitwarden-hw-key-eml.5) -- the async port of the retired `companion`
+# binary's synchronous `ureq::post` push. Already resolved at 0.13.4
+# transitively (a dependency of the pinned bitwarden-sdk-internal crates);
+# promoted to a direct dependency here since this crate's own code calls
+# `reqwest::Client` directly. "json" enables `Response::json()`, used to
+# decode the device's `SyncResponse` reply.
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
+
+# Installs the process-wide rustls `CryptoProvider` (see
+# `crate::transport::ensure_crypto_provider_installed`) -- the transitive
+# `reqwest`/`hyper-rustls` stack already resolves with rustls's "ring"
+# feature active (confirmed: `Cargo.lock`'s `rustls` entry depends on `ring`,
+# not `aws-lc-rs`), but reqwest 0.13's `rustls-no-provider` posture (also
+# already active transitively) means NOTHING installs a default
+# `CryptoProvider` automatically -- `reqwest::Client::new()` panics at
+# construction time until one is. This was a latent gap even before this
+# bead (the bitwarden SDK's own login path builds a `reqwest::Client` too),
+# just never exercised by a non-`#[ignore]`d test until this bead's
+# `push_to_unreachable_device_is_a_clean_error`/`connect_to_known_id_succeeds`
+# tests were the first in this crate to actually construct+use one.
+# `default-features = false` + `features = ["ring"]` matches the feature
+# already active in the resolved graph -- promoting it to a direct
+# dependency does not change resolution (verified: no new packages, no
+# version bumps).
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+
 [dev-dependencies]
 # In-process router testing (tower::ServiceExt::oneshot) without binding a
 # real socket — see the `tests` module in src/main.rs.

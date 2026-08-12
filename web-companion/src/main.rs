@@ -16,9 +16,12 @@ mod auth;
 mod auth_routes;
 mod routes;
 mod state;
+mod transport;
+mod transport_routes;
 mod vault;
 mod vault_routes;
 
+use std::env;
 use std::sync::Arc;
 
 use axum::{
@@ -33,6 +36,15 @@ use tower_http::services::ServeDir;
 use auth::{generate_api_token, require_bearer_token};
 use routes::{healthz, serve_index, static_dir};
 use state::{AppState, Session, TransportRegistry};
+use transport::DEFAULT_EMULATOR_URL;
+
+/// Resolves the desktop emulator's base URL for the sole Phase-1
+/// `DeviceTransport`: the `EMULATOR_URL` env var if set, else
+/// `transport::DEFAULT_EMULATOR_URL`. Resolved once, here, rather than
+/// inside `transport.rs` itself -- see that module's doc comment.
+fn emulator_url() -> String {
+    env::var("EMULATOR_URL").unwrap_or_else(|_| DEFAULT_EMULATOR_URL.to_string())
+}
 
 /// Builds the axum `Router`. Split out from `main` so tests (see
 /// `src/tests.rs`) can construct the same app with a caller-supplied
@@ -49,6 +61,8 @@ fn build_app(state: AppState) -> Router {
         .route("/vault/sync", post(vault_routes::sync))
         .route("/vault/list", get(vault_routes::list))
         .route("/vault/status", get(vault_routes::status))
+        .route("/devices", get(transport_routes::list_devices))
+        .route("/sync", post(transport_routes::sync))
         .layer(ServiceBuilder::new().layer(middleware::from_fn_with_state(
             state.clone(),
             require_bearer_token,
@@ -67,7 +81,7 @@ fn build_app(state: AppState) -> Router {
 async fn main() {
     let state = AppState {
         session: Arc::new(Mutex::new(Session::LoggedOut)),
-        transports: TransportRegistry,
+        transports: TransportRegistry::with_emulator(emulator_url()),
         api_token: generate_api_token(),
         vault_credentials: state::VaultCredentialStore::default(),
     };
@@ -100,7 +114,7 @@ mod tests {
     fn test_state() -> AppState {
         AppState {
             session: Arc::new(Mutex::new(Session::LoggedOut)),
-            transports: TransportRegistry,
+            transports: TransportRegistry::with_emulator(DEFAULT_EMULATOR_URL.to_string()),
             api_token: TEST_TOKEN.to_string(),
             vault_credentials: state::VaultCredentialStore::default(),
         }
@@ -297,6 +311,54 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn devices_without_unlocked_session_is_conflict() {
+        let response = authed_request("GET", "/api/devices", None).await;
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn devices_route_requires_bearer_token() {
+        let app = build_app(test_state());
+        let response = app
+            .oneshot(Request::get("/api/devices").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn sync_without_unlocked_session_is_conflict() {
+        let response = authed_request(
+            "POST",
+            "/api/sync",
+            Some(r#"{"target_id":"emulator","item_ids":null}"#),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn sync_route_requires_bearer_token() {
+        let app = build_app(test_state());
+        let response = app
+            .oneshot(
+                Request::post("/api/sync")
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(r#"{"target_id":"emulator"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn sync_malformed_json_is_client_error_not_panic() {
+        let response = authed_request("POST", "/api/sync", Some("not json")).await;
+        assert!(response.status().is_client_error());
     }
 
     #[tokio::test]
