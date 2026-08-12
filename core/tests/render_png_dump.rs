@@ -15,8 +15,8 @@
 
 use bhk_core::input::NavIntent;
 use bhk_core::render::chrome::TITLE_BAR_HEIGHT;
+use bhk_core::render::theme::palette;
 use bhk_core::render::{FrameBuffer565, ListItem, Navigator, Screen, VerticalList, ROW_HEIGHT};
-use embedded_graphics::pixelcolor::{Rgb565, WebColors};
 use embedded_graphics::prelude::{Point, RgbColor};
 
 const ITEM_COUNT: i32 = 3;
@@ -45,18 +45,24 @@ fn scene_renders_expected_chrome_colors() {
     navigator.render(&mut framebuffer).expect("core DrawTarget is Infallible");
 
     // Title bar background, per Screen::render.
-    assert_eq!(framebuffer.pixel(Point::new(0, 0)), Rgb565::CSS_MIDNIGHT_BLUE);
-    assert_eq!(framebuffer.pixel(Point::new(319, 0)), Rgb565::CSS_MIDNIGHT_BLUE);
+    assert_eq!(framebuffer.pixel(Point::new(0, 0)), palette::SURFACE);
+    assert_eq!(framebuffer.pixel(Point::new(319, 0)), palette::SURFACE);
 
     // First row is selected by default (initialize_focus + selected == 0):
-    // its background should be the selected-row fill, not plain black.
-    let first_row_background = framebuffer.pixel(Point::new(2, row_top(0) + 2));
-    assert_eq!(first_row_background, Rgb565::CSS_DARK_SLATE_BLUE);
+    // its background should be the selected-row elevated fill, not the
+    // plain screen background. x=300: clear of the left selection accent
+    // bar *and* clear of the row's (proportional-font, so
+    // variable-width) name/username text, so this samples the row's
+    // plain fill rather than the accent stripe or a glyph pixel.
+    let sample_x = 300;
+    let first_row_background = framebuffer.pixel(Point::new(sample_x, row_top(0) + 2));
+    assert_eq!(first_row_background, palette::SURFACE_ELEVATED);
 
-    // Below the last row (blank content area) should still be black
-    // background — proves the list isn't painting outside its own rows.
+    // Below the last row (blank content area) should still be plain
+    // screen background — proves the list isn't painting outside its own
+    // rows.
     let below_last_row = row_top(ITEM_COUNT) + 5;
-    assert_eq!(framebuffer.pixel(Point::new(2, below_last_row)), Rgb565::BLACK);
+    assert_eq!(framebuffer.pixel(Point::new(sample_x, below_last_row)), palette::BACKGROUND);
 }
 
 #[test]
@@ -67,10 +73,14 @@ fn dispatching_next_moves_the_selection_highlight_down_one_row() {
     let mut framebuffer = FrameBuffer565::new(320, 170);
     navigator.render(&mut framebuffer).expect("core DrawTarget is Infallible");
 
+    // x=300: clear of the left selection accent bar and of any row text,
+    // so this samples the plain elevated fill rather than the accent
+    // stripe or a glyph pixel.
+    let sample_x = 300;
     // Row 0's background is no longer highlighted...
-    assert_ne!(framebuffer.pixel(Point::new(2, row_top(0) + 2)), Rgb565::CSS_DARK_SLATE_BLUE);
+    assert_ne!(framebuffer.pixel(Point::new(sample_x, row_top(0) + 2)), palette::SURFACE_ELEVATED);
     // ...row 1's is.
-    assert_eq!(framebuffer.pixel(Point::new(2, row_top(1) + 2)), Rgb565::CSS_DARK_SLATE_BLUE);
+    assert_eq!(framebuffer.pixel(Point::new(sample_x, row_top(1) + 2)), palette::SURFACE_ELEVATED);
 }
 
 /// Regression test for the row-overflow bug: `FONT_6X10` positions text at
@@ -102,12 +112,12 @@ fn text_never_bleeds_past_a_rows_bottom_padding() {
                 let color = framebuffer.pixel(Point::new(x, y));
                 assert_ne!(
                     color,
-                    Rgb565::WHITE,
+                    palette::TEXT_PRIMARY,
                     "row {index}'s label text bled into its bottom padding at ({x},{y})"
                 );
                 assert_ne!(
                     color,
-                    Rgb565::CSS_GRAY,
+                    palette::TEXT_SECONDARY,
                     "row {index}'s sublabel text bled into its bottom padding at ({x},{y})"
                 );
             }
@@ -178,11 +188,11 @@ fn framebuffer_round_trips_through_a_real_png_encoder() {
     image.save(&path).expect("failed to encode/write PNG");
 
     // Round-trip: decode what we just wrote and check the title bar pixel
-    // survived encoding intact (Rgb565 CSS_MIDNIGHT_BLUE (25,25,112)
-    // downsampled to 565 and back up to 8-bit-per-channel space).
+    // survived encoding intact (the theme's `palette::SURFACE`, downsampled
+    // to 565 and back up to 8-bit-per-channel space).
     let decoded = image::open(&path).expect("failed to decode PNG we just wrote").to_rgb8();
     let title_pixel = decoded.get_pixel(0, 0);
-    let expected = Rgb565::CSS_MIDNIGHT_BLUE;
+    let expected = palette::SURFACE;
     assert_eq!(
         *title_pixel,
         image::Rgb([expected.r() << 3, expected.g() << 2, expected.b() << 3])

@@ -7,18 +7,17 @@
 use std::convert::Infallible;
 
 use embedded_graphics::{
-    mono_font::{ascii::FONT_6X10, MonoTextStyle},
-    pixelcolor::{Rgb565, WebColors},
-    prelude::{Point, Primitive, RgbColor, Size},
+    prelude::{Point, Primitive, Size},
     primitives::{PrimitiveStyle, Rectangle},
-    text::Text,
     Drawable,
 };
+use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
 
 use crate::input::NavIntent;
 
 use super::chrome::ChromeLayout;
 use super::framebuffer::FrameBuffer565;
+use super::theme::{font, palette};
 use super::widget::{Action, FocusEvent, Widget};
 
 pub struct Screen {
@@ -147,19 +146,21 @@ impl Screen {
         chrome: &ChromeLayout,
         target: &mut FrameBuffer565,
     ) -> Result<(), Infallible> {
-        let title_style = MonoTextStyle::new(&FONT_6X10, Rgb565::WHITE);
-        let hint_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_DIM_GRAY);
+        chrome.title.into_styled(PrimitiveStyle::with_fill(palette::SURFACE)).draw(target)?;
 
-        chrome
-            .title
-            .into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_MIDNIGHT_BLUE))
-            .draw(target)?;
-        Text::new(
-            &self.title,
-            Point::new(chrome.title.top_left.x + 4, chrome.title.top_left.y + 11),
-            title_style,
-        )
-        .draw(target)?;
+        // Vertically centered in the title bar via `VerticalPosition::Center`
+        // rather than a hand-picked baseline offset (the "+11" this
+        // retires) — `u8g2-fonts` derives the correct baseline from the
+        // font's own ascent/descent metrics for us.
+        let title_mid_y = chrome.title.top_left.y + chrome.title.size.height as i32 / 2;
+        let _ = font::title().render_aligned(
+            self.title.as_str(),
+            Point::new(chrome.title.top_left.x + 4, title_mid_y),
+            VerticalPosition::Center,
+            HorizontalAlignment::Left,
+            FontColor::Transparent(palette::TEXT_PRIMARY),
+            target,
+        );
 
         let mut y = chrome.content.top_left.y;
         let bottom = chrome.content.top_left.y + chrome.content.size.height as i32;
@@ -177,12 +178,15 @@ impl Screen {
         }
 
         if chrome.hint.size.height > 0 {
-            Text::new(
-                &self.hint,
-                Point::new(chrome.hint.top_left.x + 4, chrome.hint.top_left.y + 9),
-                hint_style,
-            )
-            .draw(target)?;
+            let hint_mid_y = chrome.hint.top_left.y + chrome.hint.size.height as i32 / 2;
+            let _ = font::hint().render_aligned(
+                self.hint.as_str(),
+                Point::new(chrome.hint.top_left.x + 4, hint_mid_y),
+                VerticalPosition::Center,
+                HorizontalAlignment::Left,
+                FontColor::Transparent(palette::TEXT_SECONDARY),
+                target,
+            );
         }
 
         Ok(())
@@ -231,6 +235,6 @@ mod tests {
         let mut fb = FrameBuffer565::new(320, 170);
         screen.render(&chrome, &mut fb).unwrap();
         // Title bar was filled with its background color.
-        assert_eq!(fb.pixel(Point::new(0, 0)), Rgb565::CSS_MIDNIGHT_BLUE);
+        assert_eq!(fb.pixel(Point::new(0, 0)), palette::SURFACE);
     }
 }
