@@ -19,9 +19,14 @@
 //! - [`render`]: the render core (W3) — `FrameBuffer565`,
 //!   `Widget`/`Action`/`FocusEvent`, `Screen`/`Navigator`, chrome layout,
 //!   and the `VerticalList` widget.
-//! - [`app::App`]: the platform-free application state (W7, this bead) —
-//!   the "empty-but-real" credential-list shell, wrapping a `Navigator`
-//!   over whatever `VaultItem`s the current `SyncSource` reports.
+//! - [`vault_store::VaultStore`] (M1): the App-owned, authoritative
+//!   credential state (items + derived `SyncStatus`), shared with domain
+//!   widgets via `Rc<RefCell<VaultStore>>` so a sync never has to rebuild
+//!   the `Navigator` to be reflected on screen. See
+//!   `.planning/decisions/2026-08-12-m1-vault-store-data-ownership.md`.
+//! - [`app::App`]: the platform-free application state — a `Navigator`,
+//!   built once, over a `VaultStore`-backed root credential list that
+//!   `App::step` keeps live-updated in place.
 //! - [`run::run`]: the unified, `Platform`-generic main loop (W7, this
 //!   bead) that drives an `App` — the one loop shared by all three run
 //!   modes (headless, windowed, real-target).
@@ -40,9 +45,11 @@ pub mod render;
 pub mod run;
 pub mod sync_source;
 pub mod vault_item;
+pub mod vault_store;
 
 pub use app::App;
 pub use input::NavIntent;
 pub use run::run;
 pub use sync_source::SyncSource;
 pub use vault_item::VaultItem;
+pub use vault_store::{SyncStatus, VaultStore};
