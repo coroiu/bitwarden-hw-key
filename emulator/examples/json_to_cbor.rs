@@ -1,4 +1,4 @@
-use emulator::credentials::SyncRequest;
+use push_protocol::SyncRequest;
 use std::fs;
 
 fn main() {

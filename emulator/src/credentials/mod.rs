@@ -1,50 +1,35 @@
-use bhk_core::VaultItem;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+//! The `bhk_core::VaultItem` conversion boundary for the push-protocol wire
+//! types (`push_protocol::Credential`, see the `push-protocol` crate). This
+//! impl deliberately lives here rather than in `push-protocol` itself:
+//! `push-protocol` is a pure wire crate with no `bhk-core` dependency
+//! (shared, unmodified, with the future companion app), while `emulator` is
+//! the one crate that sees both `push-protocol` and `bhk-core` and can
+//! bridge them.
+//!
+//! This can't be a `std::convert::From`/`Into` impl: with `Credential` now
+//! defined in `push-protocol` and `VaultItem` in `bhk-core`, both types are
+//! foreign to `emulator`, so `impl From<Credential> for VaultItem` here
+//! would violate Rust's orphan rule (a foreign trait needs at least one
+//! locally-defined type in the impl). `ToVaultItem` below is a trait
+//! defined *in this crate*, so implementing it for the foreign `Credential`
+//! type is legal.
 
-/// Wire/storage format for the HTTP+CBOR push protocol (dev-aid + fallback
-/// per the sync-source ADR) and the on-disk JSON credential store.
-/// Deliberately a distinct type from `bhk_core::VaultItem`: this is what
-/// crosses the network/disk boundary, `VaultItem` is what the render layer
-/// consumes. `From<Credential> for VaultItem` below is the conversion
-/// boundary between the two.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Credential {
-    pub id: Uuid,
-    pub name: String,           // "GitHub"
-    pub username: String,       // "user@example.com"
-    pub password: String,       // Plaintext for now
-    pub uri: Option<String>,    // "https://github.com"
-    pub notes: Option<String>,
+use bhk_core::VaultItem;
+use push_protocol::Credential;
+
+pub trait ToVaultItem {
+    fn to_vault_item(&self) -> VaultItem;
 }
 
-impl From<&Credential> for VaultItem {
-    fn from(credential: &Credential) -> Self {
+impl ToVaultItem for Credential {
+    fn to_vault_item(&self) -> VaultItem {
         VaultItem {
-            id: credential.id,
-            name: credential.name.clone(),
-            username: credential.username.clone(),
-            password: credential.password.clone(),
-            uri: credential.uri.clone(),
-            notes: credential.notes.clone(),
+            id: self.id,
+            name: self.name.clone(),
+            username: self.username.clone(),
+            password: self.password.clone(),
+            uri: self.uri.clone(),
+            notes: self.notes.clone(),
         }
     }
-}
-
-impl From<Credential> for VaultItem {
-    fn from(credential: Credential) -> Self {
-        VaultItem::from(&credential)
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SyncRequest {
-    pub credentials: Vec<Credential>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SyncResponse {
-    pub status: String,
-    pub synced: usize,
-    pub total_bytes: usize,
 }

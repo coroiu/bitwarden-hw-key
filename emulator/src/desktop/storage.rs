@@ -1,4 +1,4 @@
-use crate::credentials::Credential;
+use push_protocol::Credential;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs;

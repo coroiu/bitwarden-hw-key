@@ -1,7 +1,7 @@
-use crate::credentials::{Credential, SyncRequest, SyncResponse};
 use crate::desktop::DesktopStorage;
 use crate::platform::HeadlessSurface;
 use bhk_core::input::NavIntent;
+use push_protocol::{Credential, SyncRequest, SyncResponse};
 use std::collections::VecDeque;
 use std::error::Error;
 use std::net::SocketAddr;
