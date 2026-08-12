@@ -1,9 +1,9 @@
 # Project Progress
 
-**Last Updated**: 2026-08-11 (SDK spike NO-GO; pivoting to companion-app push model)
+**Last Updated**: 2026-08-12 (M0 emulator milestone complete; all 9 workstreams merged)
 
 ## Current Status
-The project vision has been re-grounded to focus on the Lilygo T-Embed (ESP32-S3, 320x170 color ST7789, rotary encoder) as the first concrete target. The old 128x32 mono OLED prototype work is complete but treated as throwaway pending a green-field GUI redesign. Current focus: **M0 (Platform Migration)**, which has not started yet. M0 will be run as a beads epic and includes architect-led UI framework design, formalization of the three run modes (headless, windowed, real-target), and an SDK feasibility spike.
+The project vision has been re-grounded to focus on the Lilygo T-Embed (ESP32-S3, 320x170 color ST7789, rotary encoder) as the first concrete target. **M0 (Platform Migration) emulator milestone is complete** as of 2026-08-12: all nine workstreams (W1–W9) have been merged to main, with a fully operational 320x170 color shell, keyboard-drivable in windowed mode and fully agent-drivable in headless mode via HTTP NavIntent injection. The only remaining M0 work is on-hardware validation on the physical T-Embed board, tracked in bead `ai-bitwarden-hw-key-dvm`. **Next focus: M1 (Vault browse)**, which will use the companion-app push model to sync real Bitwarden vault credentials to the device.
 
 ## Completed (Prototype Era: 128x32 Mono OLED + 3-Button Navigation)
 Historical work from the initial Adafruit HUZZAH32 prototype. Treated as throwaway pending M0 green-field redesign. Salvageable components: credential data model, sync/storage layer concept.
@@ -82,6 +82,40 @@ Historical work from the initial Adafruit HUZZAH32 prototype. Treated as throwaw
 
 ## In Progress
 
+### M0 (Platform Migration): Emulator Milestone Complete (2026-08-12)
+
+**Bead `ai-bitwarden-hw-key-8d7` (epic, OPEN for on-hardware validation)** — all 9 workstreams W1–W9 completed and merged to main as of 2026-08-12:
+
+**Merged Workstreams:**
+- **W1**: ADRs and interface freeze recorded (five M0 decisions in `.planning/decisions/`).
+- **W2**: Cargo workspace (core/firmware/emulator) with compiler-enforced platform-free bhk_core.
+- **W3**: Render core on embedded-graphics (FrameBuffer565 Rgb565, Widget/Navigator, chrome regions). Two render bugs found and fixed with regression tests (W3 sub-row text overflow; c2f windowed blank-window/minifb-pump).
+- **W4**: Host surfaces (MinifbSurface, HeadlessSurface, HostClock, FileStorage, WindowedInput).
+- **W5**: Headless HTTP NavIntent injection + screenshot capture (verified A→B→C credential-list movement via headless agent-driven screenshot inspection).
+- **W6**: T-Embed ESP32-S3 board adapter (St7789 via mipidsi, rotary encoder, NVS) — BUILD-ONLY, physical hardware verification pending.
+- **W7**: Unified Platform-generic run() loop + App + drivable credential-list shell. Old simple_gui/gui engines deleted.
+- **W8**: SDK feasibility spike = NO-GO on-device (ring won't link on xtensa; bitwarden-crypto not modular). Outcome: pivot to companion-app push model (decision recorded in ADR).
+- **W9**: SyncSource + PushSyncSource trait implementations.
+
+**Emulator Milestone (Done):**
+- Empty-but-real 320x170 color shell running and rendering correctly.
+- Keyboard-drivable in windowed mode (verified by live screencapture).
+- Fully agent-drivable + observable in headless mode via HTTP NavIntent injection and screenshot capture.
+- Credential-list shell operational (A→B→C selection movement verified).
+
+**On-Hardware Validation (Pending):**
+- Physical T-Embed board verification. W6 is build-only; no hardware available yet. Tracked in bead `ai-bitwarden-hw-key-dvm` (on-device verification when hardware arrives).
+- M0 epic remains OPEN until on-hardware drivability is confirmed.
+
+**Open Follow-Up Beads:**
+- `ai-bitwarden-hw-key-dvm`: On-device verification when T-Embed hardware arrives.
+- `ai-bitwarden-hw-key-ci0`: Adopt u8g2-fonts for rendering.
+- `ai-bitwarden-hw-key-5c8`: Broaden test coverage.
+- `ai-bitwarden-hw-key-7h7`: Host-build ergonomics (workspace default target esp32s3 forces --target; fix README build commands).
+- `ai-bitwarden-hw-key-1sg`: On-device SDK via private fork (DEFERRED, conditional on portable-vault validation).
+
+---
+
 ### SDK Spike Closure and Sync Direction Pivot (2026-08-11)
 
 **Spike bead `ai-bitwarden-hw-key-8d7.2` (closed)** returned a definitive NO-GO for on-device Bitwarden Rust SDK sync on ESP32-S3:
@@ -101,9 +135,9 @@ Historical work from the initial Adafruit HUZZAH32 prototype. Treated as throwaw
 
 ---
 
-### M0 (Platform Migration): Design Complete, Foundation Implementation Underway
+### M0 (Platform Migration) Architectural Foundation Summary
 
-**2026-08-11**: M0 foundational architecture has been designed and formally documented. Five M0 decisions (ADRs) recorded in `.planning/decisions/`:
+**Design decisions** (recorded 2026-08-11, all five ADRs accepted):
 
 1. **Presentation Surface and Run-Mode Seam** — Platform abstraction with four injected traits (DisplaySurface, InputSource, Clock, Storage). Canonical pixel format: Rgb565 throughout the core. Headless, windowed, and real-target differ only in surface implementation.
 2. **Portability Boundary and Workspace Split** — Three-layer Cargo workspace (`core` / `firmware` / `emulator`) enforcing platform separation at compile time. No platform-specific dependencies in the core; trait implementations live in platform-specific crates.

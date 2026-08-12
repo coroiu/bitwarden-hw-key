@@ -2,7 +2,7 @@
 
 High-level vision and milestones for the Bitwarden Hardware Key proof-of-concept.
 
-**Last Updated**: 2026-08-11
+**Last Updated**: 2026-08-12
 
 ## Project Vision
 
@@ -51,15 +51,21 @@ becomes a fallback/dev aid rather than the product path.
 
 ## Milestones
 
-### M0: Platform migration (current focus)
-Rebuild the foundation for a color display + rotary encoder, hardware-portable, T-Embed first.
-- Architect-led green-field design of the UI framework + app architecture (reuse vs rewrite vs OSS).
-- Formalize the **three run modes**: headless (agent-driven, screenshot-inspected),
-  windowed (minifb, human, no hardware), real-target (T-Embed).
-- **SDK feasibility spike** (see Open Questions): can the Bitwarden Rust SDK sync +
-  decrypt on the ESP32-S3, and at what unlock cost?
-- *Done when:* an empty-but-real color UI shell runs and is drivable by the encoder in
-  the emulator and on the T-Embed. No new product capability yet, by design.
+### M0: Platform migration (emulator milestone complete, on-hardware validation pending)
+
+**Status (2026-08-12):** All nine workstreams W1–W9 of epic `ai-bitwarden-hw-key-8d7` completed and merged to main.
+
+**Emulator Milestone (Done):**
+- Green-field UI framework redesigned and implemented on embedded-graphics + u8g2-fonts.
+- Three run modes formalized: headless (agent-driven, screenshot-inspected), windowed (minifb, human, no hardware), real-target (T-Embed).
+- SDK feasibility spike completed: verdict is NO-GO for on-device Bitwarden Rust SDK (ring won't link on xtensa; bitwarden-crypto not modular). Decision: device uses companion-app push model for M0–M2 (see [2026-08-11-sync-direction-companion-push.md](./decisions/2026-08-11-sync-direction-companion-push.md)).
+- Empty-but-real 320x170 color shell running, keyboard-drivable in windowed mode, fully agent-drivable + observable in headless mode via HTTP NavIntent injection and screenshot capture.
+- Credential-list shell operational with selection navigation verified.
+
+**On-Hardware Validation (In Progress):**
+- T-Embed ESP32-S3 board adapter code (W6) is build-only; physical hardware verification pending arrival of the board.
+- Tracked in bead `ai-bitwarden-hw-key-dvm` (on-device verification when hardware arrives).
+- *Done when:* on-T-Embed hardware, the color shell runs and is drivable by the rotary encoder. M0 epic closes after this validation.
 
 ### M1: Vault browse (portable vault, part 1)
 - Credential list + detail views designed for color + rotary encoder (Uma-led design).
