@@ -55,13 +55,15 @@ use crate::sync_source::SyncSource;
 /// callers retain ownership after `run` returns — e.g. a headless caller
 /// that wants to encode a PNG from its concrete `HeadlessSurface` once the
 /// loop stops.
-pub fn run<P: Platform>(
+pub fn run<P: Platform, S: SyncSource>(
     platform: &mut P,
     app: &mut App,
-    sync: &mut impl SyncSource,
+    sync: &mut S,
     frame_budget: Duration,
     mut should_continue: impl FnMut() -> bool,
-) {
+) where
+    S::Error: std::fmt::Display,
+{
     while should_continue() {
         let frame_start = platform.clock().now();
 

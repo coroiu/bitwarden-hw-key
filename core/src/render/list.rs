@@ -126,6 +126,27 @@ impl VerticalList {
         self
     }
 
+    /// Sets the initially selected row, clamped to the item list's bounds.
+    ///
+    /// Used by store-backed widgets (see `App`'s root credential list) that
+    /// rebuild a fresh `VerticalList` from live data on every render call
+    /// but need to carry forward the persistent selection they track
+    /// themselves — `VerticalList::new` alone always starts at `0`.
+    #[must_use]
+    pub fn with_selected(mut self, selected: usize) -> Self {
+        self.selected = selected.min(self.items.len().saturating_sub(1));
+        self
+    }
+
+    /// Sets the initial focus-highlight state. Same rationale as
+    /// `with_selected`: a caller that rebuilds this widget fresh per render
+    /// still needs to carry forward focus state it tracks itself.
+    #[must_use]
+    pub fn with_focused(mut self, focused: bool) -> Self {
+        self.focused = focused;
+        self
+    }
+
     #[must_use]
     pub fn selected_index(&self) -> usize {
         self.selected
