@@ -57,3 +57,7 @@ The architecture must decouple the **app + render core** (layout, components, in
 - Owners: `.claude/agents/fe-architect.md` (Fern), `.claude/agents/tester.md` (Tess), `.claude/agents/rust-embedded-supervisor.md` (Ruby)
 - Related: [2026-01-21-desktop-emulation.md](2026-01-21-desktop-emulation.md), [2026-01-22-emulator-http-protocol.md](2026-01-22-emulator-http-protocol.md)
 - To be scheduled as part of the T-Embed migration epic.
+
+## Updates & Learnings
+
+**2026-08-12 (W8):** Windowed verification is agent-verifiable after all. On this Mac, the orchestrator and subagents (e.g. Tess) both have macOS Screen Recording permission and can `screencapture -x <png>` the live minifb window to capture and inspect rendered output at zoom level. This closes the perceived gap where windowed rendering was thought to be un-verifiable by agents. The HEADLESS mode remains the primary agent path (in-memory framebuffer capture via HTTP endpoint, plus NavIntent injection from bead W5), but WINDOWED is now also directly testable via screencapture. The REAL-TARGET mode's on-device verification is still pending physical T-Embed hardware (tracked in bead ai-bitwarden-hw-key-dvm).

@@ -211,6 +211,15 @@ This project keeps durable knowledge in version-controlled markdown, separate fr
 ### Three run modes (testability)
 The device must be exercisable by agents in three modes — **headless** (no window; AI drives it and inspects via captured screenshots), **windowed** (minifb, for humans without hardware), and **real target** (T-Embed). Tess owns this; see the decision in `.planning/decisions/`.
 
+### Environment & workflow gotchas (learned)
+
+- **Orchestrator cannot Edit/Write on `main`.** A PreToolUse hook (`block-orchestrator-tools.sh`) blocks the main-thread orchestrator from editing files directly; it must delegate ALL file writes to subagents (docs → scribe; code → supervisors in worktrees). Separately, `enforce-branch-before-edit.sh` allows the doc surface (CLAUDE.md, .planning/**, .research/**, memory) and worktree paths even on main, and denies code writes on main.
+- **The auto-mode classifier blocks permission-escalating edits** (editing hooks, settings.json, or .cargo config that grants permissions) EVEN with user pre-approval. Hand those changes to the user; don't retry.
+- **Build invocation (until bead ai-bitwarden-hw-key-7h7 fixes it):** the workspace default target is `xtensa-esp32s3-espidf`, so plain `cargo build/test` at the repo root FAILS. Host: `cargo <cmd> -p emulator -p bhk-core --target aarch64-apple-darwin`. Firmware: `. $HOME/export-esp.sh && cargo build -p firmware`.
+- **Windowed-mode visual verification via screencapture:** on this Mac the terminal running Claude Code has macOS Screen Recording permission, and BOTH the orchestrator AND subagents (e.g. the tester) can run `screencapture -x <file>.png` to grab the live minifb emulator window and inspect it. Do NOT assume windowed rendering is un-verifiable by agents — it is verifiable. (This is how the W7 blank-window bug should have been caught.)
+- **Rendering-change verification discipline:** "tests pass + a 1x PNG + the binary launches" is INSUFFICIENT. Inspect framebuffers/PNGs at ZOOM (sub-pixel / text-overflow bugs) and, for windowed mode, screencapture the LIVE window. Evidence: W3 (sub-row text overflow) and W7/c2f (blank window) both passed weak checks and were caught only by zoomed/live inspection.
+- **Beads/worktree hygiene:** commit pending `.beads/issues.jsonl` before a merge; `git branch -d` may balk because beads auto-syncs to branch tips — verify `git log main..<branch>` is empty, then `git branch -D`; when dispatching a supervisor, tell it to create its worktree from local `main` and verify the base commit (a supervisor once branched off a stale feature branch); never put backticks in a `bd -d "..."` description (the shell command-substitutes them); `bd comment` is deprecated — use `bd comments add`.
+
 ## Current State
 
 <!--
