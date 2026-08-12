@@ -15,28 +15,37 @@
 //! Headless: `cargo run --bin desktop --target <host-triple> -- --headless
 //! [--dump-png PATH] [--frames N]`. `--dump-png` writes the framebuffer as
 //! a PNG after `N` frames (default 1) and exits — the fast path for
-//! automated/agent verification. Without `--dump-png`, headless mode just
-//! runs the loop indefinitely (there is no headless input yet — the HTTP
-//! `NavIntent` injection + screenshot protocol is bead W5 — but the
-//! `InputSource` seam is already there for W5 to plug into: see
-//! `platform::NoopInput`).
+//! automated/agent verification. Without `--dump-png`, headless mode runs
+//! the loop until an HTTP shutdown, driven entirely over HTTP (W5): `POST
+//! /api/input` injects a `NavIntent` (drained every frame by
+//! `platform::HttpInput`, the `InputSource` for this mode) and `GET
+//! /api/screenshot` returns a PNG of whatever `platform::
+//! SharedHeadlessSurface` most recently had flushed to it — the same
+//! `HeadlessSurface` PNG path `--dump-png` uses, just shared with the HTTP
+//! server thread instead of read once at loop exit. This is how an agent
+//! drives and observes the shell with no window and no hardware; see
+//! `.planning/decisions/2026-08-11-three-mode-testability.md`.
 //!
 //! The HTTP push server (`POST /api/sync`, `/api/status`, `/api/clear`,
-//! `/api/shutdown`) keeps running in both modes exactly as before — it's
-//! how a companion (or `curl`, or the Web Vault dev harness) gets
-//! credentials onto the device; `PushSyncSource` wraps it as the app's
-//! `SyncSource`.
+//! `/api/input`, `GET /api/screenshot`, `/api/shutdown`) keeps running in
+//! both modes exactly as before — it's how a companion (or `curl`, or the
+//! Web Vault dev harness) gets credentials onto the device; `PushSyncSource`
+//! wraps it as the app's `SyncSource`. `/api/screenshot` only does
+//! anything in headless mode (404 otherwise); `/api/input` is always
+//! accepted, but windowed mode's `WindowedInput` never drains the queue it
+//! feeds, so injecting there is a harmless no-op.
 
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use bhk_core::platform::Platform;
+use bhk_core::input::NavIntent;
 use bhk_core::{run, App, SyncSource};
 use emulator::desktop::{DesktopStorage, PushSyncSource, SyncServer};
-use emulator::platform::{FileStorage, HeadlessSurface, HostPlatform, MinifbSurface, NoopInput, WindowedInput};
+use emulator::platform::{FileStorage, HostPlatform, HttpInput, MinifbSurface, SharedHeadlessSurface, WindowedInput};
 use minifb::{Window, WindowOptions};
 
 const WIDTH: u32 = 320;
@@ -75,9 +84,25 @@ fn main() {
     println!("Starting desktop emulator ({} mode)...", if args.headless { "headless" } else { "windowed" });
 
     let storage_backend = Arc::new(Mutex::new(DesktopStorage::new().expect("Failed to create credential storage")));
-    let server = SyncServer::new("127.0.0.1:8080", storage_backend).expect("Failed to start HTTP server");
+    let mut server = SyncServer::new("127.0.0.1:8080", storage_backend).expect("Failed to start HTTP server");
     let credentials_ref = server.get_credentials_ref();
     let shutdown_signal = server.get_shutdown_signal();
+    let input_queue = server.get_input_queue_ref();
+
+    // The headless screenshot surface has to be created here (before the
+    // server is moved into its request-loop thread below) so the same
+    // `Arc<Mutex<HeadlessSurface>>` can be registered on `server` *and*
+    // handed to `run_headless`'s `HostPlatform` — that shared handle is
+    // what lets `GET /api/screenshot` (served on the HTTP thread) see
+    // frames the render loop (on this thread) flushes. Windowed mode never
+    // constructs one, so `/api/screenshot` there stays 404.
+    let screenshot_surface = if args.headless {
+        let surface = SharedHeadlessSurface::new();
+        server.set_screenshot_surface(surface.handle());
+        Some(surface)
+    } else {
+        None
+    };
 
     std::thread::spawn(move || {
         println!("HTTP server running on http://127.0.0.1:8080");
@@ -85,6 +110,8 @@ fn main() {
         println!("  POST /api/sync - Sync credentials (CBOR)");
         println!("  GET  /api/status - Get server status");
         println!("  POST /api/clear - Clear credentials");
+        println!("  POST /api/input - Inject a NavIntent (JSON; headless mode only takes effect)");
+        println!("  GET  /api/screenshot - PNG of the current framebuffer (headless mode only)");
         println!("  POST /api/shutdown - Shutdown emulator");
         loop {
             if let Err(e) = server.handle_request() {
@@ -100,7 +127,8 @@ fn main() {
     let mut app = App::new(WIDTH, HEIGHT, initial_items);
 
     if args.headless {
-        run_headless(&mut app, &mut sync_source, kv_storage, &shutdown_signal, &args);
+        let surface = screenshot_surface.expect("headless mode always constructs a screenshot surface above");
+        run_headless(&mut app, &mut sync_source, kv_storage, &shutdown_signal, input_queue, surface, &args);
     } else {
         run_windowed(&mut app, &mut sync_source, kv_storage, &shutdown_signal);
     }
@@ -113,24 +141,28 @@ fn run_headless(
     sync_source: &mut PushSyncSource,
     storage: FileStorage,
     shutdown_signal: &Arc<std::sync::atomic::AtomicBool>,
+    input_queue: Arc<Mutex<VecDeque<NavIntent>>>,
+    surface: SharedHeadlessSurface,
     args: &Args,
 ) {
-    let mut platform = HostPlatform::new(HeadlessSurface::new(), NoopInput::new(), storage);
+    // Keep a second handle to the same `HeadlessSurface` around: `surface`
+    // itself is about to be moved into `platform`, but `--dump-png` still
+    // needs to read the final frame back out after the loop stops.
+    let surface_handle = surface.handle();
+    let mut platform = HostPlatform::new(surface, HttpInput::new(input_queue), storage);
 
     if let Some(path) = &args.dump_png {
         // Bounded run for automated/agent verification: N frames, then dump
-        // and exit, rather than idling forever waiting for input that (until
-        // W5's HTTP injection lands) will never arrive in this mode.
+        // and exit.
         let mut frame = 0u32;
         run(&mut platform, app, sync_source, FRAME_BUDGET, || {
             frame += 1;
             frame <= args.frames
         });
-        platform.display().save_png(path).expect("failed to save headless PNG");
+        surface_handle.lock().unwrap().save_png(path).expect("failed to save headless PNG");
         println!("Wrote headless screenshot to {path} ({WIDTH}x{HEIGHT}, {} frame(s))", args.frames);
     } else {
-        println!("Headless mode running (no --dump-png given; running until HTTP shutdown).");
-        println!("Real headless input (HTTP NavIntent injection) lands in bead W5; this run mode currently only observes SyncSource updates.");
+        println!("Headless mode running. Drive it over HTTP: POST /api/input (NavIntent JSON), GET /api/screenshot (PNG).");
         run(&mut platform, app, sync_source, FRAME_BUDGET, || !shutdown_signal.load(Ordering::Relaxed));
     }
 }

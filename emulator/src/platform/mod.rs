@@ -14,13 +14,19 @@
 //!
 //! What's deliberately NOT here (later beads):
 //! - The unified `Platform`-generic main loop wiring input -> app ->
-//!   render -> present across all run modes (W7). [`host_platform`] gives
-//!   just enough wiring to construct a `Platform` and render one scene for
-//!   verification; it is not that loop.
-//! - The headless HTTP `NavIntent` injection + screenshot protocol (W5).
-//!   [`HeadlessSurface`] only exposes an in-process PNG-encode method; wiring
-//!   it to an HTTP endpoint is W5's job.
-//! - The T-Embed/ST7789 board `DisplaySurface` (W6).
+//!   render -> present across all run modes (W7, done — see
+//!   `bhk_core::run::run`). [`host_platform`] gives just enough wiring to
+//!   construct a `Platform`; the loop itself lives in `bhk_core`.
+//! - The T-Embed/ST7789 board `DisplaySurface` (W6, done — see `firmware`).
+//!
+//! The headless HTTP `NavIntent` injection + screenshot protocol (W5) is
+//! implemented here: [`headless_surface::SharedHeadlessSurface`] wraps a
+//! [`HeadlessSurface`] in an `Arc<Mutex<_>>` so both the render loop
+//! (`DisplaySurface::flush`) and `GET /api/screenshot`, served from a
+//! different thread — see `emulator::desktop::http_server::SyncServer` —
+//! can see the same captured frame; [`input::HttpInput`] is the
+//! `InputSource` counterpart, draining a `NavIntent` queue `POST
+//! /api/input` feeds.
 
 pub mod clock;
 pub mod headless_surface;
@@ -30,8 +36,8 @@ pub mod minifb_surface;
 pub mod storage;
 
 pub use clock::HostClock;
-pub use headless_surface::HeadlessSurface;
+pub use headless_surface::{HeadlessSurface, SharedHeadlessSurface};
 pub use host_platform::HostPlatform;
-pub use input::{NoopInput, WindowedInput};
+pub use input::{HttpInput, NoopInput, WindowedInput};
 pub use minifb_surface::MinifbSurface;
 pub use storage::{FileStorage, FileStorageError};
