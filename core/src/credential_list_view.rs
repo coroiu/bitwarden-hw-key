@@ -367,11 +367,12 @@ fn render_scrollbar(
 
 /// Draws a centered content message — an optional large icon, a headline,
 /// and an optional subline — for the non-list content states (waiting/
-/// empty/error). Not list-specific, but kept private to this module
-/// rather than promoted to `render::theme` (unlike `draw_selection`) —
-/// nothing outside `CredentialListView` needs it yet, and it has no
-/// framework-level generality (it's a fixed layout, not a general text
-/// component).
+/// empty/error). Not list-specific, but kept `pub(crate)` to this module
+/// rather than promoted to `render::theme` (unlike `draw_selection`) — its
+/// only two callers so far are this module's own content states and
+/// `credential_detail_view`'s "gone" state (bead `ai-bitwarden-hw-key-0v8.6`),
+/// and it has no framework-level generality (it's a fixed layout, not a
+/// general text component).
 ///
 /// Horizontally centered (`HorizontalAlignment::Center`) rather than the
 /// original left-aligned layout: per the approved M1 design language, this
@@ -388,9 +389,10 @@ fn render_scrollbar(
 /// nothing left that can fail here to report. Callers in `Widget::render`
 /// wrap this call with an explicit `Ok(())` to match the trait's
 /// signature.
-fn render_message(
+pub(crate) fn render_message(
     area: Rectangle,
     icon: Option<char>,
+    icon_color: Rgb565,
     headline: &str,
     headline_color: Rgb565,
     subline: Option<&str>,
@@ -411,7 +413,7 @@ fn render_message(
             Point::new(center_x, area.top_left.y + MESSAGE_TOP_PADDING),
             VerticalPosition::Top,
             HorizontalAlignment::Center,
-            FontColor::Transparent(palette::BRAND_BRIGHT),
+            FontColor::Transparent(icon_color),
             &mut clipped,
         );
     }
@@ -496,13 +498,14 @@ impl Widget for CredentialListView {
         match content_state(items.len(), status.as_ref()) {
             ContentState::List => self.render_list(area, &items, target),
             ContentState::Waiting => {
-                render_message(area, None, "Waiting for sync...", palette::TEXT_PRIMARY, None, target);
+                render_message(area, None, palette::BRAND_BRIGHT, "Waiting for sync...", palette::TEXT_PRIMARY, None, target);
                 Ok(())
             }
             ContentState::Empty => {
                 render_message(
                     area,
                     Some(icon::SHIELD),
+                    palette::BRAND_BRIGHT,
                     "No credentials yet",
                     palette::TEXT_PRIMARY,
                     Some("Sync from your companion app"),
@@ -511,7 +514,7 @@ impl Widget for CredentialListView {
                 Ok(())
             }
             ContentState::Error(message) => {
-                render_message(area, None, "Sync error", palette::STATUS_ERROR, Some(message), target);
+                render_message(area, None, palette::BRAND_BRIGHT, "Sync error", palette::STATUS_ERROR, Some(message), target);
                 Ok(())
             }
         }

@@ -15,21 +15,25 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::credential_detail_view::CredentialDetailView;
 use crate::credential_list_view::CredentialListView;
 use crate::input::NavIntent;
-use crate::render::{FrameBuffer565, Navigator, Screen};
+use crate::render::{Action, FrameBuffer565, Navigator, Screen};
 use crate::sync_source::SyncSource;
 use crate::vault_item::VaultItem;
 use crate::vault_store::{SyncStatus, VaultStore};
 
 /// Builds the root screen: a titled, focusable [`CredentialListView`]
-/// backed live by `store`.
+/// backed live by `store`, with `.on_activate(...)` wired (bead
+/// `ai-bitwarden-hw-key-0v8.6`) to push a [`CredentialDetailView`] for
+/// whichever credential id the list reports.
 ///
-/// No `.on_activate(...)` is registered here — there is no detail screen
-/// to push yet (that's bead `ai-bitwarden-hw-key-0v8.6`'s job). Activating
-/// the list is a documented no-op until then; see
-/// [`CredentialListView::on_activate`]'s doc comment for the seam
-/// `0v8.6` will wire up.
+/// The closure captures a fresh `Rc::clone(&store)` per call — cheap (a
+/// refcount bump), and it's the whole point of `Action::PushView` being a
+/// boxed `FnOnce() -> Screen` rather than a screen value itself: the
+/// detail screen isn't built until the moment the user actually activates
+/// a row, using whatever `id` `CredentialListView` resolved as selected at
+/// that moment.
 ///
 /// The `.with_hint(...)` here is only a fallback: `CredentialListView` is
 /// always the screen's sole (and thus always-focused) widget, so its own
@@ -38,8 +42,22 @@ use crate::vault_store::{SyncStatus, VaultStore};
 /// somehow rendered before its widget is focused still shows sane control
 /// legend text instead of a blank hint bar.
 fn credential_list_screen(store: Rc<RefCell<VaultStore>>) -> Screen {
-    let list = CredentialListView::new(store);
+    let store_for_activate = Rc::clone(&store);
+    let list = CredentialListView::new(store).on_activate(move |id| {
+        let store = Rc::clone(&store_for_activate);
+        Action::PushView(Box::new(move || credential_detail_screen(store, id)))
+    });
     Screen::new("Vault", vec![Box::new(list)]).with_hint("Rotate to browse - Press to open")
+}
+
+/// Builds a credential detail screen for `id`, backed live by `store` — see
+/// [`CredentialDetailView`]'s module doc for the live-by-id read and
+/// gone-state design. The `.with_hint(...)` fallback follows the same
+/// rationale as `credential_list_screen`'s: `CredentialDetailView`'s own
+/// `ChromeContribution::hint` overrides this in practice.
+fn credential_detail_screen(store: Rc<RefCell<VaultStore>>, id: uuid::Uuid) -> Screen {
+    let detail = CredentialDetailView::new(store, id);
+    Screen::new("Credential", vec![Box::new(detail)]).with_hint("Hold to go back")
 }
 
 /// The application core: a [`VaultStore`] holding the authoritative
@@ -88,6 +106,15 @@ impl App {
     #[must_use]
     pub fn sync_status(&self) -> Option<SyncStatus> {
         self.store.borrow().status().cloned()
+    }
+
+    /// How many screens are on the navigator's stack (>= 1). Exposed for
+    /// tests/diagnostics proving the list-activate -> detail-push -> back
+    /// -> pop seam (bead `ai-bitwarden-hw-key-0v8.6`) actually moves the
+    /// stack, without exposing the `Navigator` itself.
+    #[must_use]
+    pub fn navigator_depth(&self) -> usize {
+        self.navigator.depth()
     }
 
     /// Dispatches every polled `NavIntent` to the navigator, in order.
@@ -155,7 +182,9 @@ mod tests {
     use super::*;
     use std::convert::Infallible;
 
+    use crate::render::chrome::TITLE_BAR_HEIGHT;
     use crate::render::theme::palette;
+    use crate::render::ROW_HEIGHT;
     use embedded_graphics::pixelcolor::Rgb565;
     use embedded_graphics::prelude::Point;
     use uuid::Uuid;
@@ -309,5 +338,45 @@ mod tests {
 
         assert!(app.dirty(), "a new sync error is a status change");
         assert_eq!(app.sync_status(), Some(SyncStatus::Error("boom".to_string())));
+    }
+
+    #[test]
+    fn activating_the_selected_credential_pushes_a_detail_screen_and_back_pops_with_selection_preserved() {
+        // Bead `ai-bitwarden-hw-key-0v8.6`'s activation-seam proof, wired
+        // through the full `App` (input -> Navigator dispatch -> Action ->
+        // push/pop), not `CredentialListView`/`CredentialDetailView` in
+        // isolation (those already have their own unit coverage for
+        // "activate invokes the callback with the right id" and "renders
+        // whatever id it's given").
+        let mut app = App::new(320, 170, vec![item("GitHub"), item("AWS"), item("Postgres")]);
+        assert_eq!(app.navigator_depth(), 1, "starts on just the root list screen");
+
+        // Select the second item (AWS) before activating, so "selection
+        // preserved across the round trip" is provable below.
+        app.handle_input(vec![NavIntent::Next]);
+
+        // Row 1's (AWS's) selection-highlight pixel, per the same
+        // coordinates `handle_input_marks_dirty_and_moving_selection_changes_the_rendered_framebuffer`
+        // above uses for row 0.
+        // `TITLE_BAR_HEIGHT`/`ROW_HEIGHT` are tiny, fixed chrome/layout
+        // constants for a display this project targets (at most a few
+        // hundred pixels per side) — this can never realistically wrap.
+        #[allow(clippy::cast_possible_wrap)]
+        let row1_y = (TITLE_BAR_HEIGHT + ROW_HEIGHT + 2) as i32;
+        let sample_x = 250;
+        let row1_selected_before_activate = app.render().pixel(Point::new(sample_x, row1_y));
+        assert_eq!(row1_selected_before_activate, palette::SURFACE_ELEVATED, "AWS (row 1) is selected before activating");
+
+        app.handle_input(vec![NavIntent::Activate]);
+        assert_eq!(app.navigator_depth(), 2, "activating a credential should push a detail screen");
+
+        app.handle_input(vec![NavIntent::Back]);
+        assert_eq!(app.navigator_depth(), 1, "Back should pop the detail screen, returning to the list");
+
+        let row1_selected_after_back = app.render().pixel(Point::new(sample_x, row1_y));
+        assert_eq!(
+            row1_selected_after_back, palette::SURFACE_ELEVATED,
+            "the list's selection (AWS, row 1) must survive the push/pop round trip"
+        );
     }
 }
