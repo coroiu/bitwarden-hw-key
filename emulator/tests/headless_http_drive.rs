@@ -23,9 +23,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use bhk_core::render::chrome::TITLE_BAR_HEIGHT;
+use bhk_core::render::theme::palette;
 use bhk_core::render::ROW_HEIGHT;
 use bhk_core::{run, App, SyncSource, VaultItem};
-use embedded_graphics::pixelcolor::{Rgb565, WebColors};
 use embedded_graphics::prelude::RgbColor;
 use emulator::desktop::{DesktopStorage, SyncServer};
 use emulator::platform::{FileStorage, HostPlatform, HttpInput, SharedHeadlessSurface};
@@ -159,7 +159,7 @@ fn injecting_a_navintent_over_http_moves_the_selection_and_is_observable_in_the_
     let row0_y = TITLE_BAR_HEIGHT + 2;
     let row1_y = TITLE_BAR_HEIGHT + ROW_HEIGHT + 2;
     let sample_x = 250;
-    let highlight = Rgb565::CSS_DARK_SLATE_BLUE;
+    let highlight = palette::SURFACE_ELEVATED;
     let highlight_rgb8 = image::Rgb([highlight.r() << 3, highlight.g() << 2, highlight.b() << 3]);
 
     // --- Frame 1: render the initial state (no input yet) and observe it
