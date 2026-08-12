@@ -21,8 +21,8 @@
 
 use bhk_core::input::NavIntent;
 use bhk_core::platform::DisplaySurface;
+use bhk_core::render::theme::palette;
 use bhk_core::render::{FrameBuffer565, ListItem, Navigator, Screen, VerticalList};
-use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::RgbColor;
 use emulator::platform::minifb_surface::rasterize_scaled;
 use emulator::platform::HeadlessSurface;
@@ -108,7 +108,6 @@ fn known_chrome_colors_match_between_surfaces_at_scale_one() {
     // pinned to concrete expected colors (not just "the two surfaces
     // agree with each other", which could pass if both were wrong in the
     // same way). Mirrors the assertions in `core/tests/render_png_dump.rs`.
-    use embedded_graphics::pixelcolor::WebColors;
 
     let navigator = build_scene();
     let mut framebuffer = FrameBuffer565::new(320, 170);
@@ -121,7 +120,7 @@ fn known_chrome_colors_match_between_surfaces_at_scale_one() {
     let mut minifb_buffer = vec![0u32; (320 * 170) as usize];
     rasterize_scaled(&framebuffer, 1, &mut minifb_buffer);
 
-    let title_bar = Rgb565::CSS_MIDNIGHT_BLUE;
+    let title_bar = palette::SURFACE;
     let expected_title = (title_bar.r() << 3, title_bar.g() << 2, title_bar.b() << 3);
 
     let png_title = decoded.get_pixel(0, 0);
