@@ -22,6 +22,7 @@
 #![allow(clippy::cast_possible_truncation)]
 
 use std::convert::Infallible;
+use std::sync::{Arc, Mutex};
 
 use bhk_core::platform::{DisplaySurface, FrameBuffer565};
 use embedded_graphics::pixelcolor::Rgb565;
@@ -103,9 +104,46 @@ impl DisplaySurface for HeadlessSurface {
     }
 }
 
+/// A [`HeadlessSurface`] shared between the render-loop thread and the HTTP
+/// server thread (W5): the render loop's `DisplaySurface::flush` and
+/// `GET /api/screenshot` (served from a different thread — see
+/// `emulator::desktop::http_server::SyncServer`) both need to see the
+/// *same* captured frame, so this wraps the surface in an `Arc<Mutex<_>>`
+/// rather than handing the loop an owned `HeadlessSurface` the HTTP server
+/// has no way to read. Mirrors the `Arc<Mutex<Vec<Credential>>>` sharing
+/// pattern `PushSyncSource`/`SyncServer` already use for credentials (see
+/// `emulator::desktop::push_sync_source`).
+#[derive(Clone, Default)]
+pub struct SharedHeadlessSurface(Arc<Mutex<HeadlessSurface>>);
+
+impl SharedHeadlessSurface {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Hands out a second owner of the same underlying `HeadlessSurface` —
+    /// e.g. for `SyncServer::set_screenshot_surface` to read whatever
+    /// frame this surface's `flush` most recently wrote, from a different
+    /// thread.
+    #[must_use]
+    pub fn handle(&self) -> Arc<Mutex<HeadlessSurface>> {
+        Arc::clone(&self.0)
+    }
+}
+
+impl DisplaySurface for SharedHeadlessSurface {
+    type Error = Infallible;
+
+    fn flush(&mut self, framebuffer: &FrameBuffer565) -> Result<(), Self::Error> {
+        self.0.lock().unwrap().flush(framebuffer)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use embedded_graphics::pixelcolor::WebColors;
     use embedded_graphics::prelude::{Point, Size};
     use embedded_graphics::primitives::{PrimitiveStyle, Rectangle};
     use embedded_graphics::{draw_target::DrawTarget, prelude::Primitive, Drawable};
@@ -169,5 +207,48 @@ mod tests {
         let green = image::Rgb([Rgb565::GREEN.r() << 3, Rgb565::GREEN.g() << 2, Rgb565::GREEN.b() << 3]);
         assert_eq!(*decoded.get_pixel(3, 1), green);
         assert_eq!(*decoded.get_pixel(0, 0), image::Rgb([0, 0, 0]));
+    }
+
+    #[test]
+    fn a_handle_observes_frames_flushed_through_the_shared_surface() {
+        // This is the sharing guarantee W5 depends on: the render loop
+        // owns a `SharedHeadlessSurface` and calls `flush` on it, while
+        // the HTTP server thread only ever holds a `handle()` — it must
+        // see exactly what the loop wrote, with no separate copy to fall
+        // out of sync.
+        let mut framebuffer = FrameBuffer565::new(2, 2);
+        framebuffer.clear(Rgb565::CSS_HOT_PINK).unwrap();
+
+        let mut surface = SharedHeadlessSurface::new();
+        let handle = surface.handle();
+
+        assert!(handle.lock().unwrap().encode_png().is_none(), "nothing flushed yet");
+
+        surface.flush(&framebuffer).unwrap();
+
+        let png_bytes = handle.lock().unwrap().encode_png().expect("the handle sees the flush");
+        let decoded = image::load_from_memory(&png_bytes).unwrap().to_rgb8();
+        let expected = image::Rgb([
+            Rgb565::CSS_HOT_PINK.r() << 3,
+            Rgb565::CSS_HOT_PINK.g() << 2,
+            Rgb565::CSS_HOT_PINK.b() << 3,
+        ]);
+        assert_eq!(*decoded.get_pixel(0, 0), expected);
+    }
+
+    #[test]
+    fn cloning_a_shared_surface_shares_the_same_underlying_frame() {
+        let mut framebuffer = FrameBuffer565::new(2, 2);
+        framebuffer.clear(Rgb565::BLUE).unwrap();
+
+        let mut surface = SharedHeadlessSurface::new();
+        let clone = surface.clone();
+
+        surface.flush(&framebuffer).unwrap();
+
+        // `clone` is a second owner of the same `Arc<Mutex<HeadlessSurface>>`,
+        // not an independent copy — it must observe the flush `surface`
+        // performed after the clone was made.
+        assert!(clone.handle().lock().unwrap().encode_png().is_some());
     }
 }

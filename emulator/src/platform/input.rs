@@ -1,7 +1,9 @@
 //! Host `InputSource`s: [`WindowedInput`] (keyboard, via the shared
-//! `minifb::Window` — see `super::minifb_surface` for why it's shared) and
-//! [`NoopInput`] (a placeholder for headless mode, where real input comes
-//! from the HTTP injection protocol landing in W5, out of scope here).
+//! `minifb::Window` — see `super::minifb_surface` for why it's shared),
+//! [`HttpInput`] (headless mode, fed by `POST /api/input` — see
+//! `emulator::desktop::http_server::SyncServer`), and [`NoopInput`] (a
+//! minimal placeholder `InputSource` for callers/tests that need *some*
+//! implementation without wiring up either of the above).
 //!
 //! Mapping (per the bead): arrow up / scroll up -> `Prev`, arrow down /
 //! scroll down -> `Next`, Enter -> `Activate`, Backspace or Escape ->
@@ -16,8 +18,9 @@
 //! real OS window.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use bhk_core::input::NavIntent;
 use bhk_core::platform::InputSource;
@@ -86,10 +89,41 @@ impl InputSource for WindowedInput {
     }
 }
 
-/// Placeholder `InputSource` for headless mode: always empty. Real headless
-/// input is the HTTP `NavIntent` injection protocol (W5); until that lands,
-/// a `HostPlatform<HeadlessSurface, _>` needs *some* `InputSource` to
-/// satisfy the `Platform` bundle, and "no input yet" is an honest one.
+/// `InputSource` fed by `POST /api/input` (W5): drains whatever
+/// `NavIntent`s an agent has queued over HTTP since the last poll. The
+/// queue is an `Arc<Mutex<VecDeque<NavIntent>>>` shared with a
+/// `SyncServer` (see
+/// `emulator::desktop::http_server::SyncServer::get_input_queue_ref`) —
+/// the HTTP server thread pushes onto the back as `POST /api/input`
+/// requests arrive, this `poll()` (called every frame from the render-loop
+/// thread) drains the whole queue in FIFO order. Mirrors the
+/// `Arc<Mutex<Vec<Credential>>>` sharing pattern `PushSyncSource` already
+/// uses for credentials.
+pub struct HttpInput {
+    queue: Arc<Mutex<VecDeque<NavIntent>>>,
+}
+
+impl HttpInput {
+    /// Wraps the shared queue handle a `SyncServer` hands out via
+    /// `get_input_queue_ref()`. Cloning the `Arc` means this `HttpInput`
+    /// always drains whatever has been queued up to the moment of each
+    /// `poll()` call, including intents injected after construction.
+    #[must_use]
+    pub fn new(queue: Arc<Mutex<VecDeque<NavIntent>>>) -> Self {
+        Self { queue }
+    }
+}
+
+impl InputSource for HttpInput {
+    fn poll(&mut self) -> Vec<NavIntent> {
+        self.queue.lock().unwrap().drain(..).collect()
+    }
+}
+
+/// Minimal placeholder `InputSource`: always empty. Useful for tests and
+/// call sites (e.g. `host_platform`'s own unit test) that need *some*
+/// `InputSource` to satisfy the `Platform` bundle without wiring up either
+/// `WindowedInput` or `HttpInput`.
 #[derive(Debug, Default)]
 pub struct NoopInput;
 
@@ -167,5 +201,41 @@ mod tests {
         let mut input = NoopInput::new();
         assert!(input.poll().is_empty());
         assert!(input.poll().is_empty());
+    }
+
+    #[test]
+    fn http_input_polls_empty_when_nothing_has_been_queued() {
+        let mut input = HttpInput::new(Arc::new(Mutex::new(VecDeque::new())));
+        assert!(input.poll().is_empty());
+    }
+
+    #[test]
+    fn http_input_drains_queued_intents_in_fifo_order_and_is_empty_after() {
+        let queue = Arc::new(Mutex::new(VecDeque::new()));
+        queue.lock().unwrap().push_back(NavIntent::Next);
+        queue.lock().unwrap().push_back(NavIntent::Activate);
+        let mut input = HttpInput::new(Arc::clone(&queue));
+
+        let polled = input.poll();
+
+        assert_eq!(polled, vec![NavIntent::Next, NavIntent::Activate]);
+        assert!(queue.lock().unwrap().is_empty(), "poll must drain, not just read, the queue");
+        assert!(input.poll().is_empty(), "a second poll with nothing new queued is empty");
+    }
+
+    #[test]
+    fn http_input_reflects_intents_queued_after_construction() {
+        // The whole point of holding an `Arc` rather than a snapshot: the
+        // HTTP server thread pushes onto the same `Mutex` concurrently as
+        // requests arrive, and `HttpInput` must see those pushes on its
+        // next `poll()` without being reconstructed.
+        let queue = Arc::new(Mutex::new(VecDeque::new()));
+        let mut input = HttpInput::new(Arc::clone(&queue));
+
+        assert!(input.poll().is_empty());
+
+        queue.lock().unwrap().push_back(NavIntent::Back);
+
+        assert_eq!(input.poll(), vec![NavIntent::Back]);
     }
 }
