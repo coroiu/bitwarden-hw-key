@@ -17,6 +17,7 @@ pub async fn healthz() -> &'static str {
 
 /// `web-companion/static/`, resolved relative to the crate manifest so the
 /// server finds it regardless of the process's current working directory.
+#[must_use]
 pub fn static_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("static")
 }

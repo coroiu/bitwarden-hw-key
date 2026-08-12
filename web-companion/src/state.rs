@@ -61,6 +61,7 @@ pub enum Session {
 /// didn't reach `IdentityTokenResponse::Authenticated` never picks up any
 /// internal state worth keeping -- see eml.3 report for why re-using the
 /// client across a 2FA retry isn't necessary).
+#[must_use]
 pub fn build_client() -> Client {
     let settings = ClientSettings {
         identity_url: "https://identity.bitwarden.com".to_string(),
@@ -87,6 +88,7 @@ pub struct TransportRegistry {
 }
 
 impl TransportRegistry {
+    #[must_use]
     pub fn new(providers: Vec<Arc<dyn TransportProvider>>) -> Self {
         Self { providers }
     }
@@ -95,11 +97,13 @@ impl TransportRegistry {
     /// desktop emulator over HTTP) at `base_url`. See `main.rs` for where
     /// `base_url` is resolved (the `EMULATOR_URL` env var, falling back to
     /// `crate::transport::DEFAULT_EMULATOR_URL`).
+    #[must_use]
     pub fn with_emulator(base_url: String) -> Self {
         Self::new(vec![Arc::new(EmulatorTransportProvider::new(base_url))])
     }
 
     /// Union of every registered provider's `list_targets()`.
+    #[must_use]
     pub fn list_all_targets(&self) -> Vec<DeviceDescriptor> {
         self.providers
             .iter()
@@ -109,6 +113,12 @@ impl TransportRegistry {
 
     /// Tries each registered provider in turn; the first that recognizes
     /// `id` wins. Returns `TransportError::UnknownDevice` if none do.
+    ///
+    /// # Errors
+    ///
+    /// Returns `TransportError::UnknownDevice` if no registered provider
+    /// recognizes `id`, or whatever error the matching provider's
+    /// `connect` itself returns.
     pub async fn connect(&self, id: &str) -> Result<Box<dyn crate::transport::DeviceTransport>, TransportError> {
         for provider in &self.providers {
             match provider.connect(id).await {

@@ -36,6 +36,7 @@ const BEARER_PREFIX: &str = "Bearer ";
 
 /// Generates a per-process bearer token. See module docs for the
 /// randomness source and rationale.
+#[must_use]
 pub fn generate_api_token() -> String {
     uuid::Uuid::new_v4().to_string()
 }
@@ -43,6 +44,11 @@ pub fn generate_api_token() -> String {
 /// axum middleware requiring `Authorization: Bearer <token>` matching
 /// `state.api_token`. See module docs for what this is (and isn't) applied
 /// to.
+///
+/// # Errors
+///
+/// Returns `StatusCode::UNAUTHORIZED` if the request has no bearer token,
+/// or one that doesn't match `state.api_token`.
 pub async fn require_bearer_token(
     State(state): State<AppState>,
     req: Request,
