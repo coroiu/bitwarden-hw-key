@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core", "firmware", "emulator", "push-protocol"]
+members = ["core", "firmware", "emulator", "push-protocol", "companion"]
 
 # Profiles are workspace-level-only in Cargo; defined here so both the
 # firmware and emulator crates share them without duplication.

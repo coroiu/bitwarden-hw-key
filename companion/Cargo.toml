@@ -1,0 +1,28 @@
+[package]
+name = "companion"
+version = "0.1.0"
+authors = ["Andreas Coroiu <andreas.coroiu@gmail.com>"]
+edition = "2021"
+rust-version = "1.77"
+
+# Host-only bw-CLI -> device push bridge (M1). Deliberately minimal: this is
+# a data bridge, not a Bitwarden client. It shells out to the official `bw`
+# CLI for auth/decrypt (no crypto/SDK here), maps the JSON it prints to the
+# shared `push-protocol` wire types, and POSTs the CBOR-encoded result to
+# the device's existing `/api/sync` endpoint.
+#
+# No dependency on bhk-core, firmware, or emulator: this crate never touches
+# the render layer or device-side code, only the wire contract.
+# No direct `serde` dependency: bw's JSON is parsed as untyped
+# `serde_json::Value` (its shape is bw's, not ours, to own as typed structs),
+# and the only typed structs going over the wire (`Credential`, `SyncRequest`,
+# `SyncResponse`) already derive Serialize/Deserialize in `push-protocol`.
+#
+# See: .planning/decisions/2026-08-12-m1-companion-bw-cli-bridge.md
+
+[dependencies]
+push-protocol = { path = "../push-protocol" }
+serde_json = "1.0"
+ciborium = "0.2"
+uuid = { version = "1.8.0", features = ["v4", "serde"] }
+ureq = "2.9"
