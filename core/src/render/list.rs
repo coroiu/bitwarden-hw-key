@@ -11,16 +11,18 @@
 use std::convert::Infallible;
 
 use embedded_graphics::{
-    draw_target::DrawTargetExt,
-    prelude::{Point, Size},
-    primitives::Rectangle,
+    draw_target::{DrawTarget, DrawTargetExt},
+    pixelcolor::Rgb565,
+    prelude::{Point, Primitive, Size},
+    primitives::{PrimitiveStyle, Rectangle},
+    Drawable,
 };
 use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
 
 use crate::input::NavIntent;
 
 use super::framebuffer::FrameBuffer565;
-use super::theme::{self, font, palette};
+use super::theme::{self, font, icon, palette};
 use super::widget::{Action, FocusEvent, Widget};
 
 /// A single displayable row. Display-only: no identifiers, no domain
@@ -49,8 +51,18 @@ impl ListItem {
 
 /// Vertical padding above the name line and below the username line, and
 /// the gap between the two lines.
-const ROW_PADDING: i32 = 1;
-const LINE_GAP: i32 = 1;
+///
+/// Bumped from the original `1`/`1` (bead `ai-bitwarden-hw-key-0v8.8`'s
+/// value, tuned only to fit the new theme fonts without overflow) per
+/// Andreas's explicit design-review tweak: the approved mockup read as
+/// cramped, both between a row's own name/username lines and between
+/// consecutive rows (the bottom padding of row N plus the top padding of
+/// row N+1 is what a user perceives as "space between rows"). Chosen to
+/// visibly loosen both without shrinking the list to fewer than ~3 full
+/// rows + a scroll peek on the 320x170 panel — see `ROW_HEIGHT`'s doc
+/// comment for the resulting row budget.
+const ROW_PADDING: i32 = 3;
+const LINE_GAP: i32 = 2;
 
 /// Worst-case pixel footprint (leading + ink height, including
 /// descenders) of a single line rendered with [`font::name`]/
@@ -81,14 +93,45 @@ const USERNAME_LINE_FOOTPRINT: i32 = 15;
 /// pixel budget, not a screen-resolution assumption.
 ///
 /// Grew from `FONT_6X10`'s 23px to accommodate the larger, proportional
-/// `helvB12`/`helvR10` theme fonts (bead `ai-bitwarden-hw-key-0v8.8`) —
-/// expected, not a regression: bigger, legible fonts need more room.
-/// Still derived so the two lines' worst-case ink always fits entirely
-/// inside `[0, ROW_HEIGHT)`, the same guarantee the original `ROW_HEIGHT`
-/// doc comment describes and `render_png_dump.rs`'s
+/// `helvB12`/`helvR10` theme fonts (bead `ai-bitwarden-hw-key-0v8.8`), then
+/// grew again (35px -> 40px) for `ROW_PADDING`/`LINE_GAP`'s bead-0v8.5
+/// "more vertical air" bump. On the 320x170 panel this settles at 3 full
+/// rows visible plus a partial fourth ("a scroll peek") in the content
+/// area below the title/hint bars, rather than the tighter 4-rows-plus-a-
+/// sliver the original, denser padding gave — the deliberate trade-off
+/// Andreas asked for. Still derived so the two lines' worst-case ink
+/// always fits entirely inside `[0, ROW_HEIGHT)`, the same guarantee the
+/// original `ROW_HEIGHT` doc comment describes and `render_png_dump.rs`'s
 /// `text_never_bleeds_past_a_rows_bottom_padding` test still enforces.
 pub const ROW_HEIGHT: u32 =
     (ROW_PADDING + NAME_LINE_FOOTPRINT + LINE_GAP + USERNAME_LINE_FOOTPRINT + ROW_PADDING) as u32;
+
+/// Left margin (px) from a row's left edge to its chip's left edge.
+const CHIP_LEFT_MARGIN: i32 = 6;
+/// Gap (px) between a chip's right edge and the row's text block.
+const CHIP_TEXT_GAP: i32 = 8;
+/// Right margin (px) reserved for the focused row's disclosure caret.
+const CARET_RIGHT_MARGIN: i32 = 6;
+
+/// Side length (px) of a row's chip: sized to the two-line name+username
+/// text block's own height (`NAME_LINE_FOOTPRINT + LINE_GAP +
+/// USERNAME_LINE_FOOTPRINT`, i.e. `ROW_HEIGHT` minus its top/bottom
+/// `ROW_PADDING`) so the chip's vertical extent lines up with the text
+/// beside it instead of bleeding into the row's padding — the same
+/// "vertical padding is sacred" invariant `text_never_bleeds_past_a_rows_
+/// bottom_padding` enforces for text.
+pub(crate) fn chip_size() -> u32 {
+    (NAME_LINE_FOOTPRINT + LINE_GAP + USERNAME_LINE_FOOTPRINT) as u32
+}
+
+/// Row-relative X offset where a row's text block (name/username) starts —
+/// past the chip's left margin, its own width, and the chip-to-text gap.
+/// `pub(crate)`: see [`name_top_offset`]'s doc comment for why
+/// `credential_list_view.rs` needs to reuse layout constants like this one
+/// rather than recomputing them independently.
+pub(crate) fn text_left_offset() -> i32 {
+    CHIP_LEFT_MARGIN + chip_size() as i32 + CHIP_TEXT_GAP
+}
 
 /// Row-relative Y offset for the name line's
 /// `render_aligned(.., VerticalPosition::Top, ..)` call.
@@ -124,6 +167,104 @@ pub(crate) fn scroll_offset_for_selection(selected: usize, viewport_height: u32)
     }
     let selected_bottom = (selected as u32 + 1) * ROW_HEIGHT;
     selected_bottom.saturating_sub(viewport_height)
+}
+
+/// Draws one list row's shared visual language: an optional hairline
+/// bottom divider, the chip, the bold name line, the muted username line,
+/// and — for the focused/selected row — the full-width selection fill
+/// (via [`theme::draw_selection`]) plus a right-edge disclosure caret.
+///
+/// Extracted as a free function (rather than duplicated inside both
+/// `VerticalList::render` and `credential_list_view.rs`'s hand-rolled row
+/// loop, per [`name_top_offset`]'s doc comment on why that duplication
+/// exists at all) so the two independent row-rendering call sites cannot
+/// visually drift apart — a design tweak here lands in both places by
+/// construction, not by remembering to update both.
+///
+/// `draw_divider` is the caller's decision, not derived here: a caller
+/// iterating its own rows top-to-bottom knows whether *this* row is
+/// selected, which is the only input the divider rule needs (see the call
+/// sites) — drawn only below an *unselected* row, since a following
+/// selected row's own full-width fill (drawn on top, after, when that next
+/// row is rendered) already paints over/replaces it, and a divider
+/// directly below a *selected* row would fight the selection block's own
+/// bottom edge instead of reading as a plain row separator.
+///
+/// Generic over `D: DrawTarget<Color = Rgb565, Error = Infallible>` for
+/// the same reason [`theme::draw_selection`] is — callers pass a
+/// `DrawTargetExt::clipped()` sub-region directly.
+///
+/// # Errors
+///
+/// Returns `Infallible`'s uninhabited variant in practice — see
+/// [`super::widget::Widget::render`]'s doc comment for why the `Result`
+/// return exists at all.
+pub(crate) fn draw_row<D>(
+    target: &mut D,
+    row_rect: Rectangle,
+    name: &str,
+    username: Option<&str>,
+    selected: bool,
+    draw_divider: bool,
+) -> Result<(), Infallible>
+where
+    D: DrawTarget<Color = Rgb565, Error = Infallible>,
+{
+    if selected {
+        theme::draw_selection(row_rect, target)?;
+    } else if draw_divider {
+        let divider = Rectangle::new(
+            Point::new(row_rect.top_left.x, row_rect.top_left.y + row_rect.size.height as i32 - 1),
+            Size::new(row_rect.size.width, 1),
+        );
+        divider.into_styled(PrimitiveStyle::with_fill(palette::DIVIDER)).draw(target)?;
+    }
+
+    let initial = name.chars().next().map_or('#', |c| c.to_ascii_uppercase());
+    let chip_rect = Rectangle::new(
+        Point::new(row_rect.top_left.x + CHIP_LEFT_MARGIN, row_rect.top_left.y + ROW_PADDING),
+        Size::new_equal(chip_size()),
+    );
+    theme::draw_chip(target, chip_rect, initial)?;
+
+    let text_x = row_rect.top_left.x + text_left_offset();
+
+    let _ = font::name().render_aligned(
+        name,
+        Point::new(text_x, row_rect.top_left.y + name_top_offset()),
+        VerticalPosition::Top,
+        HorizontalAlignment::Left,
+        FontColor::Transparent(palette::TEXT_PRIMARY),
+        target,
+    );
+
+    if let Some(username) = username {
+        let _ = font::username().render_aligned(
+            username,
+            Point::new(text_x, row_rect.top_left.y + username_top_offset()),
+            VerticalPosition::Top,
+            HorizontalAlignment::Left,
+            FontColor::Transparent(palette::TEXT_SECONDARY),
+            target,
+        );
+    }
+
+    if selected {
+        let mut buf = [0_u8; 4];
+        let caret: &str = icon::CARET_RIGHT.encode_utf8(&mut buf);
+        let caret_x = row_rect.top_left.x + row_rect.size.width as i32 - CARET_RIGHT_MARGIN;
+        let caret_y = row_rect.top_left.y + row_rect.size.height as i32 / 2;
+        let _ = font::icon_1x().render_aligned(
+            caret,
+            Point::new(caret_x, caret_y),
+            VerticalPosition::Center,
+            HorizontalAlignment::Right,
+            FontColor::Transparent(palette::TEXT_PRIMARY),
+            target,
+        );
+    }
+
+    Ok(())
 }
 
 /// Callback invoked with the selected item on activation. Named as a type
@@ -267,8 +408,6 @@ impl Widget for VerticalList {
         let mut clipped = target.clipped(&area);
 
         let scroll = self.scroll_for_viewport(area.size.height);
-        let name_font = font::name();
-        let username_font = font::username();
 
         for (index, item) in self.items.iter().enumerate() {
             let row_top =
@@ -288,29 +427,15 @@ impl Widget for VerticalList {
                 Size::new(area.size.width, ROW_HEIGHT),
             );
 
-            if self.focused && index == self.selected {
-                theme::draw_selection(row_rect, &mut clipped)?;
-            }
-
-            let _ = name_font.render_aligned(
-                item.label.as_str(),
-                Point::new(area.top_left.x + 4, row_top + name_top_offset()),
-                VerticalPosition::Top,
-                HorizontalAlignment::Left,
-                FontColor::Transparent(palette::TEXT_PRIMARY),
+            let selected = self.focused && index == self.selected;
+            draw_row(
                 &mut clipped,
-            );
-
-            if let Some(sublabel) = &item.sublabel {
-                let _ = username_font.render_aligned(
-                    sublabel.as_str(),
-                    Point::new(area.top_left.x + 4, row_top + username_top_offset()),
-                    VerticalPosition::Top,
-                    HorizontalAlignment::Left,
-                    FontColor::Transparent(palette::TEXT_SECONDARY),
-                    &mut clipped,
-                );
-            }
+                row_rect,
+                item.label.as_str(),
+                item.sublabel.as_deref(),
+                selected,
+                !selected,
+            )?;
         }
 
         Ok(())

@@ -68,9 +68,9 @@ use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
 use uuid::Uuid;
 
 use crate::input::NavIntent;
-use crate::render::list::{name_top_offset, scroll_offset_for_selection, username_top_offset};
-use crate::render::theme::{self, font, palette};
-use crate::render::{Action, FocusEvent, FrameBuffer565, Widget, ROW_HEIGHT};
+use crate::render::list::{draw_row, name_top_offset, scroll_offset_for_selection, username_top_offset};
+use crate::render::theme::{font, icon, palette};
+use crate::render::{Action, ChromeContribution, ChromeStatus, FocusEvent, FrameBuffer565, Widget, ROW_HEIGHT};
 use crate::vault_item::VaultItem;
 use crate::vault_store::{SyncStatus, VaultStore};
 
@@ -87,7 +87,18 @@ const MIN_THUMB_HEIGHT: u32 = 4;
 /// Extra top padding (beyond the label's own baseline offset) before the
 /// first line of an empty/waiting/error content message, so it isn't
 /// glued to the chrome's title-bar boundary.
-const MESSAGE_TOP_PADDING: i32 = 10;
+const MESSAGE_TOP_PADDING: i32 = 16;
+
+/// Approximate square footprint (px) of `font::icon_4x()` glyphs — u8g2
+/// scales `open_iconic_all` in even multiples of its ~8px 1x unit, so 4x is
+/// ~32px. Only used to budget vertical space before the headline in
+/// [`render_message`]; a few pixels of slack either way just changes the
+/// gap, not correctness.
+const MESSAGE_ICON_SIZE: i32 = 32;
+
+/// Gap (px) between [`render_message`]'s icon (when present) and its
+/// headline text.
+const MESSAGE_ICON_GAP: i32 = 12;
 
 /// Callback invoked with the selected [`VaultItem`]'s id when the list is
 /// activated (encoder short press / `NavIntent::Activate`) while focused.
@@ -256,9 +267,6 @@ impl CredentialListView {
 
         let scroll = selected.map_or(0, |index| scroll_offset_for_selection(index, area.size.height));
 
-        let name_font = font::name();
-        let username_font = font::username();
-
         {
             let mut clipped = target.clipped(&rows_area);
 
@@ -276,31 +284,43 @@ impl CredentialListView {
                     Size::new(rows_area.size.width, ROW_HEIGHT),
                 );
 
-                if self.focused && selected == Some(index) {
-                    theme::draw_selection(row_rect, &mut clipped)?;
-                }
-
-                let _ = name_font.render_aligned(
+                let row_selected = self.focused && selected == Some(index);
+                draw_row(
+                    &mut clipped,
+                    row_rect,
                     item.name.as_str(),
-                    Point::new(rows_area.top_left.x + 4, row_top + name_top_offset()),
-                    VerticalPosition::Top,
-                    HorizontalAlignment::Left,
-                    FontColor::Transparent(palette::TEXT_PRIMARY),
-                    &mut clipped,
-                );
-
-                let _ = username_font.render_aligned(
-                    item.username.as_str(),
-                    Point::new(rows_area.top_left.x + 4, row_top + username_top_offset()),
-                    VerticalPosition::Top,
-                    HorizontalAlignment::Left,
-                    FontColor::Transparent(palette::TEXT_SECONDARY),
-                    &mut clipped,
-                );
+                    Some(item.username.as_str()),
+                    row_selected,
+                    !row_selected,
+                )?;
             }
         }
 
         render_scrollbar(area, items.len(), area.size.height, scroll, target)
+    }
+
+    /// The right-aligned title-bar readout (e.g. `"2 / 5"`), or `None` when
+    /// there's nothing to count (no items). 1-based for the numerator —
+    /// "row 0 selected" should read "1 / 5", not "0 / 5".
+    fn readout(&self) -> Option<String> {
+        let count = self.item_count();
+        if count == 0 {
+            return None;
+        }
+        self.selected_index().map(|index| format!("{} / {count}", index + 1))
+    }
+
+    /// Maps the store's derived [`SyncStatus`] to the chrome's semantic
+    /// [`ChromeStatus`], per Andreas's spec: `Synced` -> success (green),
+    /// `Error` -> error (red/amber), `Empty` -> neutral. `None` (no sync
+    /// attempted yet) also reads as neutral — there's no "bad" news yet,
+    /// just no news.
+    fn chrome_status(&self) -> ChromeStatus {
+        match self.store.borrow().status() {
+            Some(SyncStatus::Synced) => ChromeStatus::Success,
+            Some(SyncStatus::Error(_)) => ChromeStatus::Error,
+            Some(SyncStatus::Empty) | None => ChromeStatus::Neutral,
+        }
     }
 }
 
@@ -345,12 +365,21 @@ fn render_scrollbar(
     thumb.into_styled(PrimitiveStyle::with_fill(palette::TEXT_SECONDARY)).draw(target)
 }
 
-/// Draws a two-line content message (headline + optional subline) for the
-/// non-list content states (waiting/empty/error). Not list-specific, but
-/// kept private to this module rather than promoted to `render::theme`
-/// (unlike `draw_selection`) — nothing outside `CredentialListView` needs
-/// it yet, and it has no framework-level generality (it's a fixed
-/// two-line layout, not a general text component).
+/// Draws a centered content message — an optional large icon, a headline,
+/// and an optional subline — for the non-list content states (waiting/
+/// empty/error). Not list-specific, but kept private to this module
+/// rather than promoted to `render::theme` (unlike `draw_selection`) —
+/// nothing outside `CredentialListView` needs it yet, and it has no
+/// framework-level generality (it's a fixed layout, not a general text
+/// component).
+///
+/// Horizontally centered (`HorizontalAlignment::Center`) rather than the
+/// original left-aligned layout: per the approved M1 design language, this
+/// reads as a deliberate "nothing to show here" state, not a truncated
+/// list row, and centering is what sells that — most visibly for the
+/// `icon` case (`ContentState::Empty`'s shield + "No credentials yet"),
+/// but applied uniformly so waiting/error don't look like a different
+/// design language from empty.
 ///
 /// Returns `()`, not `Result<(), Infallible>` like most of this module's
 /// draw helpers: every draw call inside deliberately discards
@@ -361,18 +390,37 @@ fn render_scrollbar(
 /// signature.
 fn render_message(
     area: Rectangle,
+    icon: Option<char>,
     headline: &str,
     headline_color: Rgb565,
     subline: Option<&str>,
     target: &mut FrameBuffer565,
 ) {
     let mut clipped = target.clipped(&area);
+    let center_x = area.top_left.x + area.size.width as i32 / 2;
+
+    let text_top = area.top_left.y
+        + MESSAGE_TOP_PADDING
+        + if icon.is_some() { MESSAGE_ICON_SIZE + MESSAGE_ICON_GAP } else { 0 };
+
+    if let Some(icon_char) = icon {
+        let mut buf = [0_u8; 4];
+        let icon_str: &str = icon_char.encode_utf8(&mut buf);
+        let _ = font::icon_4x().render_aligned(
+            icon_str,
+            Point::new(center_x, area.top_left.y + MESSAGE_TOP_PADDING),
+            VerticalPosition::Top,
+            HorizontalAlignment::Center,
+            FontColor::Transparent(palette::BRAND_BRIGHT),
+            &mut clipped,
+        );
+    }
 
     let _ = font::name().render_aligned(
         headline,
-        Point::new(area.top_left.x + 8, area.top_left.y + MESSAGE_TOP_PADDING + name_top_offset()),
+        Point::new(center_x, text_top + name_top_offset()),
         VerticalPosition::Top,
-        HorizontalAlignment::Left,
+        HorizontalAlignment::Center,
         FontColor::Transparent(headline_color),
         &mut clipped,
     );
@@ -380,12 +428,9 @@ fn render_message(
     if let Some(subline) = subline {
         let _ = font::username().render_aligned(
             subline,
-            Point::new(
-                area.top_left.x + 8,
-                area.top_left.y + MESSAGE_TOP_PADDING + username_top_offset(),
-            ),
+            Point::new(center_x, text_top + username_top_offset()),
             VerticalPosition::Top,
-            HorizontalAlignment::Left,
+            HorizontalAlignment::Center,
             FontColor::Transparent(palette::TEXT_SECONDARY),
             &mut clipped,
         );
@@ -451,12 +496,13 @@ impl Widget for CredentialListView {
         match content_state(items.len(), status.as_ref()) {
             ContentState::List => self.render_list(area, &items, target),
             ContentState::Waiting => {
-                render_message(area, "Waiting for sync...", palette::TEXT_PRIMARY, None, target);
+                render_message(area, None, "Waiting for sync...", palette::TEXT_PRIMARY, None, target);
                 Ok(())
             }
             ContentState::Empty => {
                 render_message(
                     area,
+                    Some(icon::SHIELD),
                     "No credentials yet",
                     palette::TEXT_PRIMARY,
                     Some("Sync from your companion app"),
@@ -465,10 +511,33 @@ impl Widget for CredentialListView {
                 Ok(())
             }
             ContentState::Error(message) => {
-                render_message(area, "Sync error", palette::STATUS_ERROR, Some(message), target);
+                render_message(area, None, "Sync error", palette::STATUS_ERROR, Some(message), target);
                 Ok(())
             }
         }
+    }
+
+    /// Always contributes: a right-aligned "N / M" readout (when there are
+    /// items to count), a title-bar status dot derived from the store's
+    /// [`SyncStatus`], and contextual hint text that differs between "there
+    /// is a list to browse" and "there is nothing to browse, go back." This
+    /// widget is unconditionally focusable (see `is_focusable`'s doc
+    /// comment) and is the only widget on its screen, so its contribution
+    /// is shown on every frame regardless of item count/content state.
+    fn chrome_contribution(&self) -> Option<ChromeContribution> {
+        let has_items = self.item_count() > 0;
+        let hint = if has_items {
+            "Rotate to browse - Press to open"
+        } else {
+            "Hold to go back"
+        };
+
+        Some(ChromeContribution {
+            title: None,
+            readout: self.readout(),
+            hint: Some(hint.to_string()),
+            status: Some(self.chrome_status()),
+        })
     }
 }
 

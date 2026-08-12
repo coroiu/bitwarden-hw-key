@@ -70,6 +70,56 @@ pub enum Action {
     None,
 }
 
+/// A status-dot color a [`ChromeContribution`] can ask the chrome to paint
+/// in the title bar — semantic (what the status *means*), not a raw
+/// `Rgb565`, so the mapping to an actual palette color lives in one place
+/// ([`super::screen::Screen::render`]) instead of every widget picking its
+/// own shade of green/red.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChromeStatus {
+    /// Everything's fine (e.g. `VaultStore`'s last sync succeeded with
+    /// items) — rendered in [`super::theme::palette::STATUS_SUCCESS`].
+    Success,
+    /// Something's wrong (e.g. the last sync failed) — rendered in
+    /// [`super::theme::palette::STATUS_ERROR`].
+    Error,
+    /// Neither good nor bad news yet (e.g. no sync has run, or it
+    /// succeeded with an empty vault) — rendered in a muted neutral color,
+    /// not silently omitted, so "we have no status opinion" still reads as
+    /// a deliberate state rather than a missing dot.
+    Neutral,
+}
+
+/// What a focused widget wants the chrome (title bar + hint bar) to show
+/// on its behalf, for the current frame. Returned fresh from
+/// [`Widget::chrome_contribution`] on every render rather than pushed/
+/// cached, for the same reason `CredentialListView` reads its `VaultStore`
+/// live: whatever it reports must reflect the current frame's true state.
+///
+/// Each field is independently optional: a widget can override just the
+/// hint text and leave the title/readout/status to their screen-level
+/// defaults ([`super::screen::Screen::render`] falls back to the screen's
+/// static `title`/`hint` for a `None`, and simply omits the readout/status
+/// dot when those are `None`). This is the seam a later detail-view widget
+/// (bead `ai-bitwarden-hw-key-0v8.6`) uses to supply its own live title and
+/// hint without `Screen`/`chrome.rs` needing to know anything
+/// list-specific or detail-specific.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChromeContribution {
+    /// Overrides the screen's static title, if set (e.g. a detail view
+    /// showing the credential's own name instead of "Vault").
+    pub title: Option<String>,
+    /// A right-aligned position readout (e.g. `"2 / 5"`), if this widget
+    /// has a meaningful position/count to report.
+    pub readout: Option<String>,
+    /// Overrides the screen's static hint text, if set (e.g. contextual
+    /// control legends that change with content state).
+    pub hint: Option<String>,
+    /// A status-dot color to paint in the title bar, if this widget has an
+    /// app-wide status worth surfacing there.
+    pub status: Option<ChromeStatus>,
+}
+
 /// A retained-mode UI element. Implementors own their own state (selection
 /// index, scroll offset, ...) and are told their assigned screen-space
 /// `area` at render/measure time — nothing in a `Widget` impl should assume
@@ -119,5 +169,16 @@ pub trait Widget {
     /// screens.
     fn on_intent(&mut self, _intent: NavIntent) -> Action {
         Action::None
+    }
+
+    /// This widget's contribution to the chrome (title bar + hint bar) for
+    /// the current frame, if any. Only ever consulted for the *focused*
+    /// widget on a screen (see `Screen::chrome_contribution`) — an
+    /// unfocused widget has no business overriding chrome that isn't
+    /// "its" right now. Defaults to `None` (no override): static labels,
+    /// dividers, and any widget with nothing dynamic to report don't need
+    /// to implement this.
+    fn chrome_contribution(&self) -> Option<ChromeContribution> {
+        None
     }
 }
