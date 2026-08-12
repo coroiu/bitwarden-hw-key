@@ -7,6 +7,8 @@ use push_protocol::Credential;
 use tokio::sync::Mutex;
 use zeroize::{Zeroize, Zeroizing};
 
+use crate::transport::{DeviceDescriptor, EmulatorTransportProvider, TransportError, TransportProvider};
+
 /// Email + master password stashed server-side across a `POST
 /// /api/auth/login` -> `POST /api/auth/2fa` round trip (see
 /// `crate::auth_routes` module docs for the full state machine).
@@ -69,12 +71,55 @@ pub fn build_client() -> Client {
     Client::new(Some(settings))
 }
 
-/// Placeholder for the future device-transport registry (BLE/USB/etc.
-/// links to the physical hardware key). Real transport wiring is out of
-/// scope for this bead -- this type exists only so `AppState` has a slot
-/// for it, per the eml.2 design.
-#[derive(Debug, Default, Clone)]
-pub struct TransportRegistry;
+/// Unions every registered `TransportProvider`'s view of the world into one
+/// surface `crate::transport_routes` reads from. Phase 1
+/// (ai-bitwarden-hw-key-eml.5) registers exactly one provider (the desktop
+/// emulator over HTTP, see `with_emulator`); BLE/USB providers are Phase 2
+/// (the T-Embed hardware migration) and would simply be additional entries
+/// in `providers`.
+///
+/// `Arc<dyn TransportProvider>` clones cheaply, so `Vec` of them derives
+/// `Clone` for free -- `AppState` clones a `TransportRegistry` on every
+/// handler invocation like everything else it holds.
+#[derive(Clone)]
+pub struct TransportRegistry {
+    providers: Vec<Arc<dyn TransportProvider>>,
+}
+
+impl TransportRegistry {
+    pub fn new(providers: Vec<Arc<dyn TransportProvider>>) -> Self {
+        Self { providers }
+    }
+
+    /// Convenience constructor wiring up the one Phase-1 provider (the
+    /// desktop emulator over HTTP) at `base_url`. See `main.rs` for where
+    /// `base_url` is resolved (the `EMULATOR_URL` env var, falling back to
+    /// `crate::transport::DEFAULT_EMULATOR_URL`).
+    pub fn with_emulator(base_url: String) -> Self {
+        Self::new(vec![Arc::new(EmulatorTransportProvider::new(base_url))])
+    }
+
+    /// Union of every registered provider's `list_targets()`.
+    pub fn list_all_targets(&self) -> Vec<DeviceDescriptor> {
+        self.providers
+            .iter()
+            .flat_map(|provider| provider.list_targets())
+            .collect()
+    }
+
+    /// Tries each registered provider in turn; the first that recognizes
+    /// `id` wins. Returns `TransportError::UnknownDevice` if none do.
+    pub async fn connect(&self, id: &str) -> Result<Box<dyn crate::transport::DeviceTransport>, TransportError> {
+        for provider in &self.providers {
+            match provider.connect(id).await {
+                Ok(transport) => return Ok(transport),
+                Err(TransportError::UnknownDevice(_)) => {}
+                Err(other) => return Err(other),
+            }
+        }
+        Err(TransportError::UnknownDevice(id.to_string()))
+    }
+}
 
 /// The ONLY place plaintext vault passwords live server-side, held in
 /// memory only (never persisted to disk -- see `crate::vault` for how it's
@@ -128,13 +173,11 @@ impl VaultCredentialStore {
 /// eml.1: it wraps `Arc<InternalClient>`), so `Arc<Mutex<Session>>` is safe
 /// to clone across handler invocations/tasks.
 ///
-/// `transports` is not read by any handler yet -- the future
-/// transport-wiring bead is what will read it. `#[allow(dead_code)]`
-/// documents that gap rather than hiding it.
+/// `transports` is read by `crate::transport_routes` (`GET /api/devices`,
+/// `POST /api/sync`) -- see `TransportRegistry` above.
 #[derive(Clone)]
 pub struct AppState {
     pub session: Arc<Mutex<Session>>,
-    #[allow(dead_code)]
     pub transports: TransportRegistry,
     pub api_token: String,
     /// See `VaultCredentialStore` docs -- the server-side-only decrypted
