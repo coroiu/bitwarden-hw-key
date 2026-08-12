@@ -1,0 +1,6 @@
+[toolchain]
+# Own pin, deliberately separate from the root repo's `esp` channel
+# (rust-toolchain.toml at repo root). sdk-internal @ 99ffb6e requires
+# rust-version = "1.88.0" and edition 2024; 1.91.1 is the locally installed
+# stable toolchain and satisfies both.
+channel = "1.91.1"
