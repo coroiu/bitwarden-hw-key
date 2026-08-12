@@ -168,6 +168,7 @@ pub struct HttpEmulatorTransport {
 }
 
 impl HttpEmulatorTransport {
+    #[must_use]
     pub fn new(base_url: String) -> Self {
         ensure_crypto_provider_installed();
         Self {
@@ -219,6 +220,7 @@ pub struct EmulatorTransportProvider {
 }
 
 impl EmulatorTransportProvider {
+    #[must_use]
     pub fn new(base_url: String) -> Self {
         Self { base_url }
     }

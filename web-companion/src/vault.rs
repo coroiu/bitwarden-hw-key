@@ -99,6 +99,11 @@ impl std::fmt::Display for VaultSyncError {
 ///
 /// Requires an already-`Unlocked` `Client` (caller's responsibility --
 /// `crate::vault_routes` enforces this via `Session`).
+///
+/// # Errors
+///
+/// Returns `VaultSyncError::Sync` if the SDK's own account sync
+/// (`client.sync().sync(...)`) fails (e.g. network error, expired session).
 pub async fn sync_and_decrypt(client: &Client) -> Result<Vec<Credential>, VaultSyncError> {
     let captured: Arc<Mutex<Vec<CipherDetailsResponseModel>>> = Arc::new(Mutex::new(Vec::new()));
 
