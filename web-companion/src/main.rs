@@ -1,43 +1,36 @@
 //! web-companion: local HTTP server that lets the Bitwarden Web Vault sync
 //! credentials to the hardware key over a same-origin, token-gated API.
 //!
-//! Phase 1 (this bead, ai-bitwarden-hw-key-eml.2): axum server skeleton
-//! only. Binds `127.0.0.1:3000` -- loopback ONLY, never `0.0.0.0` (the
-//! desktop emulator owns `:8080` on the same machine; see repo
-//! `CLAUDE.md`). No SDK login/sync logic yet -- see eml.3 (login) / eml.4
-//! (sync), which will build on the `Client` construction proved compiling
-//! against the pinned SDK rev in eml.1 and wired into `AppState` here.
+//! Phase 1 (ai-bitwarden-hw-key-eml.2): axum server skeleton. Binds
+//! `127.0.0.1:3000` -- loopback ONLY, never `0.0.0.0` (the desktop emulator
+//! owns `:8080` on the same machine; see repo `CLAUDE.md`).
+//!
+//! Phase 2 (ai-bitwarden-hw-key-eml.3, this bead): the `/api/auth/*` login
+//! state machine (see `crate::auth_routes`), built on the `Client`
+//! construction proved compiling against the pinned SDK rev in eml.1.
+//! Vault sync is still out of scope -- see eml.4.
 //!
 //! See `crate::auth` for the token generation/delivery/enforcement design.
 
 mod auth;
+mod auth_routes;
 mod routes;
 mod state;
 
 use std::sync::Arc;
 
-use axum::{middleware, routing::get, Router};
-use bitwarden_core::{Client, ClientSettings, DeviceType};
+use axum::{
+    middleware,
+    routing::{get, post},
+    Router,
+};
 use tokio::{net::TcpListener, sync::Mutex};
 use tower::ServiceBuilder;
 use tower_http::services::ServeDir;
 
 use auth::{generate_api_token, require_bearer_token};
-use routes::{auth_status_stub, healthz, serve_index, static_dir};
+use routes::{healthz, serve_index, static_dir};
 use state::{AppState, Session, TransportRegistry};
-
-/// Constructs a `Client` the way Phase 1 will (carried over from the
-/// eml.1 feasibility spike): no credentials touched, no network calls made
-/// here.
-fn build_client() -> Client {
-    let settings = ClientSettings {
-        identity_url: "https://identity.bitwarden.com".to_string(),
-        api_url: "https://api.bitwarden.com".to_string(),
-        device_type: DeviceType::SDK,
-        ..ClientSettings::default()
-    };
-    Client::new(Some(settings))
-}
 
 /// Builds the axum `Router`. Split out from `main` so tests (see
 /// `src/tests.rs`) can construct the same app with a caller-supplied
@@ -45,7 +38,12 @@ fn build_client() -> Client {
 /// `tower::ServiceExt::oneshot`, without binding a real socket.
 fn build_app(state: AppState) -> Router {
     let api_routes = Router::new()
-        .route("/auth/status", get(auth_status_stub))
+        .route("/auth/status", get(auth_routes::status))
+        .route("/auth/login", post(auth_routes::login))
+        .route("/auth/login-apikey", post(auth_routes::login_apikey))
+        .route("/auth/2fa", post(auth_routes::two_factor))
+        .route("/auth/lock", post(auth_routes::lock))
+        .route("/auth/logout", post(auth_routes::logout))
         .layer(ServiceBuilder::new().layer(middleware::from_fn_with_state(
             state.clone(),
             require_bearer_token,
@@ -62,14 +60,6 @@ fn build_app(state: AppState) -> Router {
 
 #[tokio::main]
 async fn main() {
-    // Proves `Client::new` runs at startup (this bead's core claim) without
-    // touching credentials or the network. The result is intentionally
-    // discarded: a fresh process with no prior login has nowhere to put a
-    // `Client` yet -- `Session::LoggedOut` carries none by design (see
-    // `state::Session` docs). eml.3 will thread a real `Client` into
-    // `Session::Locked`/`Unlocked` once login exists.
-    let _client = build_client();
-
     let state = AppState {
         session: Arc::new(Mutex::new(Session::LoggedOut)),
         transports: TransportRegistry,
@@ -160,9 +150,10 @@ mod tests {
             )
             .await
             .unwrap();
-        // 501, not 401/403 -- proves the middleware let it through to the
-        // (deliberately unimplemented) stub handler.
-        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+        // 200 with a real status body, not 401/403 -- proves the
+        // middleware let it through to the real handler (see
+        // auth_status_reflects_logged_out_by_default below for the body).
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[tokio::test]
@@ -177,5 +168,127 @@ mod tests {
         let body = String::from_utf8(body.to_vec()).unwrap();
         assert!(body.contains(TEST_TOKEN));
         assert!(!body.contains("__API_TOKEN__"));
+    }
+
+    async fn authed_request(
+        method: &str,
+        path: &str,
+        json_body: Option<&str>,
+    ) -> axum::http::Response<Body> {
+        let app = build_app(test_state());
+        let mut builder = Request::builder()
+            .method(method)
+            .uri(path)
+            .header("Authorization", format!("Bearer {TEST_TOKEN}"));
+        let body = if let Some(json) = json_body {
+            builder = builder.header("Content-Type", "application/json");
+            Body::from(json.to_string())
+        } else {
+            Body::empty()
+        };
+        app.oneshot(builder.body(body).unwrap()).await.unwrap()
+    }
+
+    async fn body_json(response: axum::http::Response<Body>) -> serde_json::Value {
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn auth_status_reflects_logged_out_by_default() {
+        let response = authed_request("GET", "/api/auth/status", None).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = body_json(response).await;
+        assert_eq!(body["status"], "logged_out");
+    }
+
+    #[tokio::test]
+    async fn login_missing_master_password_is_bad_request() {
+        let response = authed_request("POST", "/api/auth/login", Some(r#"{"email":"a@b.com"}"#))
+            .await;
+        assert!(response.status().is_client_error());
+    }
+
+    #[tokio::test]
+    async fn login_malformed_json_is_client_error_not_panic() {
+        let response = authed_request("POST", "/api/auth/login", Some("not json")).await;
+        assert!(response.status().is_client_error());
+    }
+
+    #[tokio::test]
+    async fn login_empty_master_password_is_bad_request() {
+        let response = authed_request(
+            "POST",
+            "/api/auth/login",
+            Some(r#"{"email":"a@b.com","master_password":""}"#),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn two_factor_without_pending_login_is_bad_request() {
+        let response = authed_request(
+            "POST",
+            "/api/auth/2fa",
+            Some(r#"{"provider":1,"token":"123456"}"#),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn two_factor_malformed_provider_is_client_error_not_panic() {
+        // provider must be a small integer (TwoFactorProvider's repr) --
+        // a string here must be a clean 4xx, not a panic.
+        let response = authed_request(
+            "POST",
+            "/api/auth/2fa",
+            Some(r#"{"provider":"not-a-number","token":"123456"}"#),
+        )
+        .await;
+        assert!(response.status().is_client_error());
+    }
+
+    #[tokio::test]
+    async fn lock_without_active_session_is_conflict() {
+        let response = authed_request("POST", "/api/auth/lock", None).await;
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn logout_without_active_session_is_idempotent_ok() {
+        let response = authed_request("POST", "/api/auth/logout", None).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = body_json(response).await;
+        assert_eq!(body["status"], "logged_out");
+    }
+
+    #[tokio::test]
+    async fn login_apikey_missing_fields_is_bad_request() {
+        let response = authed_request(
+            "POST",
+            "/api/auth/login-apikey",
+            Some(r#"{"client_id":"","client_secret":"","master_password":""}"#),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    /// Exercises the REAL SDK login error path against the real Bitwarden
+    /// identity server with bogus credentials. Proves `LoginError` maps to
+    /// a clean 401 (not a 500/panic) end-to-end. Makes an outbound network
+    /// call -- `#[ignore]`d by default; run manually with:
+    /// `cargo test --test-threads=1 -- --ignored bogus_credentials_login_maps_to_401`
+    #[tokio::test]
+    #[ignore = "makes a real network call to https://identity.bitwarden.com"]
+    async fn bogus_credentials_login_maps_to_401() {
+        let response = authed_request(
+            "POST",
+            "/api/auth/login",
+            Some(r#"{"email":"definitely-not-a-real-account@example.com","master_password":"definitely-wrong"}"#),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 }

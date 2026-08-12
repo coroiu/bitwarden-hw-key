@@ -33,6 +33,16 @@ axum = "0.7"
 tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["fs"] }
 
+# Auth API (ai-bitwarden-hw-key-eml.3): request/response DTOs for
+# /api/auth/*. Already pulled in transitively by bitwarden-core/axum, but
+# depended on directly since our own DTOs derive Serialize/Deserialize.
+serde = { version = "1", features = ["derive"] }
+# zeroize the stashed master password held across a login -> 2FA round
+# trip (see web-companion/src/state.rs `PendingTwoFactorLogin`). Already
+# pulled in transitively by bitwarden-crypto; depended on directly since we
+# construct `Zeroizing<String>` ourselves.
+zeroize = "1"
+
 # All four pinned to ONE commit of bitwarden/sdk-internal (see rev below).
 # bitwarden-crypto and bitwarden-collections are pulled in transitively by
 # bitwarden-core/bitwarden-vault; this build did not need to depend on them
@@ -48,3 +58,6 @@ bitwarden-api-api = { git = "https://github.com/bitwarden/sdk-internal", rev = "
 # In-process router testing (tower::ServiceExt::oneshot) without binding a
 # real socket — see the `tests` module in src/main.rs.
 http-body-util = "0.1"
+# JSON (de)serialization round-trip tests for the auth API DTOs (see
+# src/auth_routes.rs `tests` module).
+serde_json = "1"
