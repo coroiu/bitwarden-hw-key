@@ -1,0 +1,23 @@
+[package]
+name = "push-protocol"
+version = "0.1.0"
+authors = ["Andreas Coroiu <andreas.coroiu@gmail.com>"]
+edition = "2021"
+rust-version = "1.77"
+
+# Pure wire-format crate for the HTTP+CBOR companion-app push protocol
+# (`POST /api/sync`). Deliberately depends on nothing but serde/ciborium/uuid
+# so it can be shared, unmodified, between the `emulator` crate and the
+# (future) companion app without either pulling in the other's world:
+# no `bhk-core`, no `firmware`, no `emulator`. Anything that needs to know
+# about `bhk_core::VaultItem` (the `From<Credential> for VaultItem`
+# conversion) lives in `emulator` instead, which is the only crate that sees
+# both sides of the boundary.
+#
+# See: .planning/decisions (M1 push-protocol workspace split, per Ada's M1
+# architecture report).
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+ciborium = "0.2"
+uuid = { version = "1.8.0", features = ["v4", "serde"] }

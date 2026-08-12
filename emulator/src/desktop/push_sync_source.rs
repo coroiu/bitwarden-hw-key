@@ -9,16 +9,17 @@
 //! adapter that turns "give me whatever the companion most recently
 //! pushed" into the `SyncSource::sync() -> Vec<VaultItem>` shape the app
 //! core expects, doing the `Credential` -> `VaultItem` conversion
-//! (`From<&Credential> for VaultItem`, defined in `crate::credentials`) at
-//! the boundary.
+//! (`ToVaultItem::to_vault_item`, defined in `crate::credentials`) at the
+//! boundary.
 //!
 //! `sync()` never actually fails today (reading a shared `Vec` behind a
 //! `Mutex` has no failure mode other than a poisoned lock, which would
 //! indicate a prior panic elsewhere and is not something this type can
 //! meaningfully recover from), so `Error = Infallible`.
 
-use crate::credentials::Credential;
+use crate::credentials::ToVaultItem;
 use bhk_core::{SyncSource, VaultItem};
+use push_protocol::Credential;
 use std::convert::Infallible;
 use std::sync::{Arc, Mutex};
 
@@ -43,7 +44,7 @@ impl SyncSource for PushSyncSource {
 
     fn sync(&mut self) -> Result<Vec<VaultItem>, Self::Error> {
         let credentials = self.credentials.lock().unwrap();
-        Ok(credentials.iter().map(VaultItem::from).collect())
+        Ok(credentials.iter().map(Credential::to_vault_item).collect())
     }
 }
 
