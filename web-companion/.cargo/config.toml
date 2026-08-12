@@ -1,0 +1,12 @@
+[build]
+# FINDING (ai-bitwarden-hw-key-eml.1): Cargo's `.cargo/config.toml` lookup
+# walks UP the directory tree from the current working directory and is NOT
+# scoped by `[workspace]` boundaries. Without this override, `cargo build`
+# run from inside `web-companion/` still picks up the ROOT repo's
+# `.cargo/config.toml` (`[build] target = "xtensa-esp32s3-espidf"`), which
+# fails immediately (no xtensa std, no ESP toolchain wanted here). A nested
+# `[workspace]` in web-companion/Cargo.toml stops Cargo's *manifest* walk
+# (keeps `web-companion` out of the root package graph) but does NOT stop
+# the separate `.cargo/config.toml` walk. This explicit override is
+# required for the host build to work; it is not just a nice-to-have.
+target = "aarch64-apple-darwin"

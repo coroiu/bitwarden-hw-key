@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
 members = ["core", "firmware", "emulator", "push-protocol", "companion"]
+# web-companion is a standalone nested Cargo workspace (own [workspace], own
+# stable rust-toolchain.toml, own Cargo.lock) for the Bitwarden PM SDK
+# feasibility spike (ai-bitwarden-hw-key-eml.1). It must stay excluded so the
+# esp/xtensa root workspace never descends into it (and vice versa).
+exclude = ["web-companion"]
 
 # Profiles are workspace-level-only in Cargo; defined here so both the
 # firmware and emulator crates share them without duplication.

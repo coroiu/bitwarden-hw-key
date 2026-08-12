@@ -1,0 +1,39 @@
+[package]
+name = "web-companion"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Deliberately its own top-level [workspace] (see rust-toolchain.toml note
+# below): this stops Cargo's upward directory walk at this crate, so it is
+# NOT swept into the root repo's xtensa/esp workspace, and the root workspace
+# never tries to build it either (see root Cargo.toml `exclude`).
+#
+# Feasibility-gate spike for the web-companion epic (Ada design,
+# ai-bitwarden-hw-key-eml.1): PROVE that the Bitwarden PM SDK crate set
+# (bitwarden/sdk-internal, git dep) resolves and links on a host stable
+# toolchain from inside this repo, without touching the esp/xtensa root
+# workspace. No credentials, no runtime login — build/link/compile only.
+[workspace]
+members = ["."]
+
+[dependencies]
+# Cross-workspace path dep into the sibling wire-format crate (root workspace
+# member). Confirmed this pulls in ONLY push-protocol + its own deps
+# (serde/ciborium/uuid), not bhk-core/firmware/emulator/esp-idf — see
+# ai-bitwarden-hw-key-eml.1 report for the pollution check.
+push-protocol = { path = "../push-protocol" }
+
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+uuid = { version = "1", features = ["v4"] }
+
+# All four pinned to ONE commit of bitwarden/sdk-internal (see rev below).
+# bitwarden-crypto and bitwarden-collections are pulled in transitively by
+# bitwarden-core/bitwarden-vault; this build did not need to depend on them
+# directly.
+bitwarden-core = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6", features = [
+    "internal",
+] }
+bitwarden-vault = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
+bitwarden-sync = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
+bitwarden-api-api = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
