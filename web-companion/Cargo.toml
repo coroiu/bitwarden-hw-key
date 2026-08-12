@@ -25,7 +25,13 @@ members = ["."]
 push-protocol = { path = "../push-protocol" }
 
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs"] }
-uuid = { version = "1", features = ["v4"] }
+# "serde" so `Uuid` (used directly in the `/api/vault/list` metadata DTO,
+# ai-bitwarden-hw-key-eml.4) can derive through `Serialize`. Already enabled
+# transitively via push-protocol's `uuid` feature set (same resolved crate
+# version, Cargo feature-unifies across the workspace), but named explicitly
+# here so this crate's own need for it isn't hidden behind another crate's
+# Cargo.toml.
+uuid = { version = "1", features = ["v4", "serde"] }
 
 # axum server skeleton (ai-bitwarden-hw-key-eml.2): "fs" enables
 # tower_http::services::ServeDir for the static UI assets.
@@ -43,16 +49,27 @@ serde = { version = "1", features = ["derive"] }
 # construct `Zeroizing<String>` ourselves.
 zeroize = "1"
 
-# All four pinned to ONE commit of bitwarden/sdk-internal (see rev below).
-# bitwarden-crypto and bitwarden-collections are pulled in transitively by
-# bitwarden-core/bitwarden-vault; this build did not need to depend on them
-# directly.
+# All pinned to ONE commit of bitwarden/sdk-internal (see rev below).
+# bitwarden-collections is pulled in transitively by bitwarden-core/
+# bitwarden-vault; this build did not need to depend on it directly.
+# bitwarden-crypto WAS transitive-only through eml.3, but eml.4 (vault
+# read) calls `KeyStore<KeySlotIds>::decrypt` and names `CryptoError`
+# directly (see src/vault.rs), so it is now a direct dependency too.
 bitwarden-core = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6", features = [
     "internal",
 ] }
 bitwarden-vault = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
 bitwarden-sync = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
 bitwarden-api-api = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
+bitwarden-crypto = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
+
+# `bitwarden_sync::SyncHandler` is defined with `#[async_trait::async_trait]`
+# (see sdk-internal crates/bitwarden-sync/src/handler.rs) -- external
+# implementors (our `CipherCaptureHandler` in src/vault.rs) apply the same
+# macro to their `impl` block so the desugared signatures match. Pinned to
+# the same version the SDK itself uses (Cargo.lock @ 99ffb6ef) though any
+# semver-compatible 0.1 release would produce an identical expansion.
+async-trait = "0.1"
 
 [dev-dependencies]
 # In-process router testing (tower::ServiceExt::oneshot) without binding a
@@ -61,3 +78,8 @@ http-body-util = "0.1"
 # JSON (de)serialization round-trip tests for the auth API DTOs (see
 # src/auth_routes.rs `tests` module).
 serde_json = "1"
+# Constructing `CipherView` fixtures in src/vault.rs unit tests
+# (`creation_date`/`revision_date: DateTime<Utc>`). Already pulled in
+# transitively by bitwarden-sync; depended on directly since test code
+# constructs `Utc::now()` itself.
+chrono = "0.4"

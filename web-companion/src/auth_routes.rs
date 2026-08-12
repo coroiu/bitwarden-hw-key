@@ -309,7 +309,13 @@ pub async fn lock(State(state): State<AppState>) -> Response {
     match &*session {
         Session::Unlocked(_) => {
             // Dropping the old value here drops the `Client`, releasing
-            // our only reference to its internal key material.
+            // our only reference to its internal key material. Also clear
+            // the server-side decrypted vault (eml.4) -- it must not
+            // outlive the session that decrypted it. Cleared while still
+            // holding the session lock so a concurrent `/api/vault/*`
+            // request can't observe a locked session with a stale
+            // credential set.
+            state.vault_credentials.clear().await;
             *session = Session::LoggedOut;
             Json(AuthStatus::LoggedOut).into_response()
         }
@@ -325,9 +331,11 @@ pub async fn lock(State(state): State<AppState>) -> Response {
 
 /// `POST /api/auth/logout` -- always succeeds, from any state. Drops
 /// whatever was in `session` (a `Client` and/or a stashed
-/// `PendingTwoFactorLogin`), zeroizing any stashed password.
+/// `PendingTwoFactorLogin`), zeroizing any stashed password, and clears the
+/// server-side decrypted vault (eml.4) -- see `lock` above for why.
 pub async fn logout(State(state): State<AppState>) -> Response {
     let mut session = state.session.lock().await;
+    state.vault_credentials.clear().await;
     *session = Session::LoggedOut;
     Json(AuthStatus::LoggedOut).into_response()
 }

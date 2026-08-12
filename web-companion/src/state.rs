@@ -3,8 +3,9 @@
 use std::sync::Arc;
 
 use bitwarden_core::{Client, ClientSettings, DeviceType};
+use push_protocol::Credential;
 use tokio::sync::Mutex;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Email + master password stashed server-side across a `POST
 /// /api/auth/login` -> `POST /api/auth/2fa` round trip (see
@@ -75,6 +76,52 @@ pub fn build_client() -> Client {
 #[derive(Debug, Default, Clone)]
 pub struct TransportRegistry;
 
+/// The ONLY place plaintext vault passwords live server-side, held in
+/// memory only (never persisted to disk -- see `crate::vault` for how it's
+/// populated via SDK sync + decrypt, and `crate::vault_routes` for why the
+/// `/api/vault/list` surface built on top of this never serializes a
+/// password back out).
+///
+/// `replace` zeroizes the outgoing generation's passwords before dropping
+/// them (best-effort: `String::zeroize` overwrites the heap buffer via a
+/// volatile write, matching the level of rigor `Zeroizing<String>` gets
+/// elsewhere in this crate for the stashed master password -- see
+/// `PendingTwoFactorLogin`). `push_protocol::Credential` is a shared wire
+/// type (also used by the emulator/device side), so it does not itself
+/// derive `Zeroize`; this store does the zeroizing at the boundary instead.
+#[derive(Clone, Default)]
+pub struct VaultCredentialStore {
+    credentials: Arc<Mutex<Vec<Credential>>>,
+}
+
+impl VaultCredentialStore {
+    /// Replaces the retained credential set (e.g. after a vault sync),
+    /// zeroizing the passwords of whatever generation this replaces.
+    pub async fn replace(&self, new_credentials: Vec<Credential>) {
+        let mut guard = self.credentials.lock().await;
+        for credential in guard.iter_mut() {
+            credential.password.zeroize();
+        }
+        *guard = new_credentials;
+    }
+
+    /// Returns a clone of the full credential set, WITH passwords. Callers
+    /// outside this module must never forward this verbatim over HTTP --
+    /// see `crate::vault_routes::VaultListItem` for the metadata-only
+    /// projection that is safe to serve to the browser.
+    pub async fn get_all(&self) -> Vec<Credential> {
+        self.credentials.lock().await.clone()
+    }
+
+    /// Drops the retained credential set, zeroizing passwords first. Called
+    /// on `/api/auth/lock` and `/api/auth/logout` (see `crate::auth_routes`)
+    /// -- there is no reason for a server-side password to outlive the
+    /// session that decrypted it.
+    pub async fn clear(&self) {
+        self.replace(Vec::new()).await;
+    }
+}
+
 /// Shared state handed to every axum handler via `axum::extract::State`.
 ///
 /// `Client` (inside `Session`) is `Send + Sync + Clone` (confirmed in
@@ -90,4 +137,7 @@ pub struct AppState {
     #[allow(dead_code)]
     pub transports: TransportRegistry,
     pub api_token: String,
+    /// See `VaultCredentialStore` docs -- the server-side-only decrypted
+    /// vault, populated by `crate::vault_routes::sync`.
+    pub vault_credentials: VaultCredentialStore,
 }
