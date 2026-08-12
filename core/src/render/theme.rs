@@ -143,18 +143,32 @@ pub mod font {
     }
 
     /// `open_iconic` glyphs at 1x scale (roughly 8x8px) — for compact
-    /// inline icons (e.g. a caret next to text-sized content).
+    /// inline icons (e.g. a row's focus caret), and deliberately also the
+    /// title bar's shield mark (bead `ai-bitwarden-hw-key-0v8.5`): the
+    /// design-review mockup used `icon_2x` there, which — inside the fixed
+    /// `TITLE_BAR_HEIGHT`-px bar — left the mark touching the bar's top/
+    /// bottom edges with no breathing room; Andreas asked for a smaller
+    /// mark with more air around it, and `icon_1x` is what leaves that air
+    /// without shrinking `TITLE_BAR_HEIGHT` itself.
     #[must_use]
     pub const fn icon_1x() -> FontRenderer {
         FontRenderer::new::<fonts::u8g2_font_open_iconic_all_1x_t>()
     }
 
-    /// `open_iconic` glyphs at 2x scale (roughly 16x16px) — for chrome
-    /// marks (e.g. the title bar's shield) and field-level status icons
-    /// (e.g. the lock in a password field).
+    /// `open_iconic` glyphs at 2x scale (roughly 16x16px) — for
+    /// field-level status icons (e.g. the lock in a password field).
     #[must_use]
     pub const fn icon_2x() -> FontRenderer {
         FontRenderer::new::<fonts::u8g2_font_open_iconic_all_2x_t>()
+    }
+
+    /// `open_iconic` glyphs at 4x scale (roughly 32x32px) — for a large,
+    /// centered decorative mark (e.g. the empty-vault content state's
+    /// shield), never for chrome (too big for the fixed-height title/hint
+    /// bars).
+    #[must_use]
+    pub const fn icon_4x() -> FontRenderer {
+        FontRenderer::new::<fonts::u8g2_font_open_iconic_all_4x_t>()
     }
 }
 

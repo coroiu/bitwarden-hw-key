@@ -30,9 +30,16 @@ use crate::vault_store::{SyncStatus, VaultStore};
 /// the list is a documented no-op until then; see
 /// [`CredentialListView::on_activate`]'s doc comment for the seam
 /// `0v8.6` will wire up.
+///
+/// The `.with_hint(...)` here is only a fallback: `CredentialListView` is
+/// always the screen's sole (and thus always-focused) widget, so its own
+/// [`crate::render::ChromeContribution::hint`] always overrides this in
+/// practice (see `Screen::render`) — kept non-empty anyway so a screen
+/// somehow rendered before its widget is focused still shows sane control
+/// legend text instead of a blank hint bar.
 fn credential_list_screen(store: Rc<RefCell<VaultStore>>) -> Screen {
     let list = CredentialListView::new(store);
-    Screen::new("Vault", vec![Box::new(list)]).with_hint("Next/Prev  Select  Back")
+    Screen::new("Vault", vec![Box::new(list)]).with_hint("Rotate to browse - Press to open")
 }
 
 /// The application core: a [`VaultStore`] holding the authoritative
