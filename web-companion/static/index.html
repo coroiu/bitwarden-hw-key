@@ -2,23 +2,101 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bitwarden Web Companion</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <!--
-    Placeholder UI (ai-bitwarden-hw-key-eml.2, Phase 1 server skeleton).
-    The real sync-to-device UI is ai-bitwarden-hw-key-eml.6 scope.
+  <header class="app-header">
+    <h1>Bitwarden Web Companion</h1>
+    <div id="status-bar" class="status-bar hidden">
+      <span id="status-text" class="status-text"></span>
+      <button id="lock-btn" type="button" class="btn btn-quiet">Lock</button>
+      <button id="logout-btn" type="button" class="btn btn-quiet">Log out</button>
+    </div>
+  </header>
 
-    The placeholder token string in the script tag below is substituted
-    server-side at request time (see src/routes.rs::serve_index) with the
-    real per-process bearer token. This file is never served as a static
-    asset for "/": it is always rendered through that dynamic handler so
-    the substitution happens. Other static assets (CSS/JS that don't need
-    the token) are served unmodified via tower_http::services::ServeDir.
-  -->
-  <p>web-companion Phase 1 server skeleton is running.</p>
+  <main class="app-main">
+    <!-- LOGIN VIEW -->
+    <section id="view-login" class="view card">
+      <h2>Log in to your vault</h2>
+      <p class="muted">Use your Bitwarden account email and master password.</p>
+      <form id="login-form" novalidate>
+        <label class="field">
+          <span>Email address</span>
+          <input type="email" id="login-email" name="email" autocomplete="username" required />
+        </label>
+        <label class="field">
+          <span>Master password</span>
+          <input type="password" id="login-password" name="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="btn btn-primary">Log in</button>
+      </form>
+      <p id="login-error" class="error-text hidden" role="alert"></p>
+    </section>
+
+    <!-- TWO-FACTOR VIEW -->
+    <section id="view-twofactor" class="view card hidden">
+      <h2>Two-step login</h2>
+      <p class="muted">Enter the verification code for your two-step login method.</p>
+      <form id="twofactor-form" novalidate>
+        <label class="field">
+          <span>Method</span>
+          <select id="twofactor-provider" name="provider"></select>
+        </label>
+        <label class="field">
+          <span>Verification code</span>
+          <input type="text" id="twofactor-code" name="code" inputmode="numeric" autocomplete="one-time-code" required />
+        </label>
+        <div class="button-row">
+          <button type="submit" class="btn btn-primary">Verify</button>
+          <button type="button" id="twofactor-cancel" class="btn btn-quiet">Cancel</button>
+        </div>
+      </form>
+      <p id="twofactor-error" class="error-text hidden" role="alert"></p>
+    </section>
+
+    <!-- AUTHENTICATED APP VIEW -->
+    <section id="view-app" class="view hidden">
+      <section class="card">
+        <div class="panel-header">
+          <h2>Vault</h2>
+          <button id="vault-refresh-btn" type="button" class="btn btn-secondary">Sync from Bitwarden</button>
+        </div>
+        <p id="vault-meta" class="muted"></p>
+        <p id="vault-error" class="error-text hidden" role="alert"></p>
+
+        <div class="toolbar">
+          <input type="search" id="vault-search" placeholder="Search by name, username, or URL" />
+          <label class="select-all">
+            <input type="checkbox" id="vault-select-all" />
+            <span>Select all</span>
+          </label>
+        </div>
+
+        <div id="vault-list" class="vault-list" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <h2>Send to device</h2>
+        <label class="field">
+          <span>Target device</span>
+          <select id="device-select"></select>
+        </label>
+        <p id="device-error" class="error-text hidden" role="alert"></p>
+
+        <div class="button-row">
+          <button id="sync-btn" type="button" class="btn btn-primary">Sync to device</button>
+        </div>
+        <p id="sync-hint" class="muted"></p>
+        <p id="sync-result" class="result-text hidden" role="status"></p>
+      </section>
+    </section>
+  </main>
+
   <script>
     window.__BHK_API_TOKEN__ = "__API_TOKEN__";
   </script>
+  <script src="/app.js" defer></script>
 </body>
 </html>
