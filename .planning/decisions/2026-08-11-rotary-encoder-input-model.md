@@ -123,3 +123,28 @@ This **keeps the high-level focus-management system intact** (`FocusEvent`, opt-
 - Owners: Fern (fe-architect), Ruby (rust-embedded-supervisor)
 - Related decisions: [2026-08-11-presentation-surface-run-mode-seam.md](2026-08-11-presentation-surface-run-mode-seam.md), [2026-01-21-focus-management-system.md](2026-01-21-focus-management-system.md) (transport superseded; high-level focus events retained)
 - Roadmap Open Question 6 (large vaults: enabled by `NextN` acceleration)
+
+## Amendment: 2026-08-12
+
+### Hardware Confirmation
+The Lilygo T-Embed uses a single rotary encoder wheel (quadrature CW/CCW, approximately 24 detents on the plain variant) with an integrated center push-button. There is NO d-pad or directional button cluster; input is encoder-only. The encoder-only input model in this ADR stands unchanged.
+
+### NavIntent Extension
+Added `NavIntent::PrevN(u16)` as the symmetric counterpart to `NextN`, enabling fast reverse rotation to accelerate upward through a large vault. The current asymmetry left fast reverse-scroll impossible. This was chosen over refactoring to a signed `Jump(i16)` to avoid re-opening every match site.
+
+```rust
+pub enum NavIntent {
+    Next,            // Move to next item
+    Prev,            // Move to previous item
+    NextN(u16),      // Jump forward N items
+    PrevN(u16),      // Jump backward N items (NEW)
+    Activate,        // Select focused item
+    Back,            // Return to parent / modal dismiss
+}
+```
+
+### Board Variants
+The project will support BOTH the plain T-Embed (primary; encoder A/B/BTN on GPIO2/GPIO1/GPIO0) and the T-Embed CC1101 (encoder on GPIO4/GPIO5/GPIO0 plus an independent user button on GPIO6, a candidate for a dedicated Back). Selection is a build-time firmware concern (feature flags or board selection in Cargo.toml); the app layer stays board-agnostic via NavIntent. Tracked in bead ai-bitwarden-hw-key-ekd.
+
+### Firmware Caveat
+The encoder press is on GPIO0, which is also the ESP32-S3 BOOT strapping pin. Holding it during power-on enters download mode. Any hold-to-X UX must account for this (e.g., ensure long-press is only detected after the device has fully booted).
