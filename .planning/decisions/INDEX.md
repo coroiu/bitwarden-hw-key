@@ -12,8 +12,9 @@ Quick reference for all architectural and technical decisions made in this proje
 
 | Date | Title | Status | File |
 |------|-------|--------|------|
+| 2026-08-12 | Web Companion: Local Rust Server + Thin Web UI with Native SDK | Accepted | [2026-08-12-web-companion-local-server.md](2026-08-12-web-companion-local-server.md) |
 | 2026-08-12 | M1 Vault Data Ownership: Shared VaultStore Observed by Domain Widgets | Accepted | [2026-08-12-m1-vault-store-data-ownership.md](2026-08-12-m1-vault-store-data-ownership.md) |
-| 2026-08-12 | M1 Companion: bw-CLI Bridge + Shared Push-Protocol Crate | Accepted | [2026-08-12-m1-companion-bw-cli-bridge.md](2026-08-12-m1-companion-bw-cli-bridge.md) |
+| 2026-08-12 | M1 Companion: bw-CLI Bridge + Shared Push-Protocol Crate | Superseded | [2026-08-12-m1-companion-bw-cli-bridge.md](2026-08-12-m1-companion-bw-cli-bridge.md) |
 | 2026-08-11 | Sync Direction: Companion-App Push (Near-Term) and Private-Fork Deferral (Long-Term) | Accepted | [2026-08-11-sync-direction-companion-push.md](2026-08-11-sync-direction-companion-push.md) |
 | 2026-08-11 | UI Framework: Retire Both Existing GUIs, Rewrite Clean on Embedded-Graphics | Accepted | [2026-08-11-ui-framework-reuse-vs-rewrite.md](2026-08-11-ui-framework-reuse-vs-rewrite.md) |
 | 2026-08-11 | Sync Source Abstraction and Deferred SDK Decision | Accepted | [2026-08-11-sync-source-abstraction.md](2026-08-11-sync-source-abstraction.md) |

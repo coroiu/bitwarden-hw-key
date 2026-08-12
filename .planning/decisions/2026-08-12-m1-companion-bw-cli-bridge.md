@@ -1,7 +1,11 @@
 # M1 Companion: bw-CLI Bridge + Shared Push-Protocol Crate
 
 **Date**: 2026-08-12
-**Status**: Accepted
+**Status**: Superseded (2026-08-12)
+
+**Superseded By**: [2026-08-12-web-companion-local-server.md](2026-08-12-web-companion-local-server.md) (local Rust server + web UI)
+
+**Supersession Note**: The bw-CLI bridge approach was built and verified as a proof-of-concept (bead ai-bitwarden-hw-key-eml.1), proving that the device-side `/api/sync` push protocol works end-to-end with real Bitwarden credentials. However, Andreas clarified that the companion should be an interactive website where users can browse the vault and control sync. The web-companion local-server ADR supersedes this by adding a browser UI and native SDK integration. The bw-CLI bridge remains as a reference implementation and fallback for non-interactive scenarios.
 
 ## Context
 
