@@ -222,15 +222,26 @@ impl Screen {
         let title_mid_y = chrome.title.top_left.y + chrome.title.size.height as i32 / 2;
 
         // Shield mark: `icon_1x`, not `icon_2x` — see that accessor's doc
-        // comment for why (Andreas's "smaller, more air" tweak).
+        // comment for why (Andreas's "smaller, more air" tweak). Centered
+        // on its own *ink* bounding box, not `VerticalPosition::Center`
+        // (which centers on the font's line metrics/ascent-descent
+        // budget, not this specific glyph's ink) — the same mismatch
+        // `theme::draw_chip`'s doc comment describes for the chip-letter
+        // fix, and the reason the shield reads visibly off-center at
+        // `icon_1x`'s small size even though it looked fine at `icon_2x`.
         let shield_font = font::icon_1x();
         let mut shield_buf = [0_u8; 4];
         let shield_str: &str = icon::SHIELD.encode_utf8(&mut shield_buf);
         let shield_x = chrome.title.top_left.x + TITLE_SIDE_MARGIN;
+        let shield_ink = shield_font
+            .get_rendered_dimensions_aligned(shield_str, Point::zero(), VerticalPosition::Top, HorizontalAlignment::Left)
+            .unwrap_or(None);
+        let shield_y =
+            shield_ink.map_or(title_mid_y, |ink| title_mid_y - (ink.top_left.y + ink.size.height as i32 / 2));
         let _ = shield_font.render_aligned(
             shield_str,
-            Point::new(shield_x, title_mid_y),
-            VerticalPosition::Center,
+            Point::new(shield_x, shield_y),
+            VerticalPosition::Top,
             HorizontalAlignment::Left,
             FontColor::Transparent(palette::BRAND_BRIGHT),
             target,

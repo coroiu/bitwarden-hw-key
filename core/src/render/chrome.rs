@@ -17,7 +17,16 @@ use embedded_graphics::primitives::Rectangle;
 /// Height of the title bar, in pixels.
 pub const TITLE_BAR_HEIGHT: u32 = 16;
 /// Height of the hint/status bar, in pixels.
-pub const HINT_BAR_HEIGHT: u32 = 12;
+///
+/// Bumped from `12` (bead `ai-bitwarden-hw-key-0v8.5`, post-review polish
+/// pass): at `12`, vertically centering the hint text in the bar left the
+/// text sitting only a couple of pixels below the bar's top divider line
+/// (see `Screen::render`), reading as cramped even after that bead's
+/// earlier `HINT_SIDE_MARGIN` bump — Andreas asked for more breathing room
+/// specifically between the divider and the text. `18` gives the centered
+/// text a visibly larger gap on both sides without a dedicated
+/// above-the-divider layout special-case.
+pub const HINT_BAR_HEIGHT: u32 = 18;
 
 /// The three fixed regions a screen renders into.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
