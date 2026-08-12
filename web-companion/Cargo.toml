@@ -24,8 +24,14 @@ members = ["."]
 # ai-bitwarden-hw-key-eml.1 report for the pollution check.
 push-protocol = { path = "../push-protocol" }
 
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "fs"] }
 uuid = { version = "1", features = ["v4"] }
+
+# axum server skeleton (ai-bitwarden-hw-key-eml.2): "fs" enables
+# tower_http::services::ServeDir for the static UI assets.
+axum = "0.7"
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["fs"] }
 
 # All four pinned to ONE commit of bitwarden/sdk-internal (see rev below).
 # bitwarden-crypto and bitwarden-collections are pulled in transitively by
@@ -37,3 +43,8 @@ bitwarden-core = { git = "https://github.com/bitwarden/sdk-internal", rev = "99f
 bitwarden-vault = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
 bitwarden-sync = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
 bitwarden-api-api = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
+
+[dev-dependencies]
+# In-process router testing (tower::ServiceExt::oneshot) without binding a
+# real socket — see the `tests` module in src/main.rs.
+http-body-util = "0.1"

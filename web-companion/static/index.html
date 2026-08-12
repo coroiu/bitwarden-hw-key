@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Bitwarden Web Companion</title>
+</head>
+<body>
+  <!--
+    Placeholder UI (ai-bitwarden-hw-key-eml.2, Phase 1 server skeleton).
+    The real sync-to-device UI is ai-bitwarden-hw-key-eml.6 scope.
+
+    The placeholder token string in the script tag below is substituted
+    server-side at request time (see src/routes.rs::serve_index) with the
+    real per-process bearer token. This file is never served as a static
+    asset for "/": it is always rendered through that dynamic handler so
+    the substitution happens. Other static assets (CSS/JS that don't need
+    the token) are served unmodified via tower_http::services::ServeDir.
+  -->
+  <p>web-companion Phase 1 server skeleton is running.</p>
+  <script>
+    window.__BHK_API_TOKEN__ = "__API_TOKEN__";
+  </script>
+</body>
+</html>

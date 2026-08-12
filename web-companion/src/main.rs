@@ -1,37 +1,34 @@
-//! Feasibility-gate spike (ai-bitwarden-hw-key-eml.1): prove the Bitwarden PM
-//! SDK (bitwarden/sdk-internal, pinned commit 99ffb6ef) resolves and LINKS
-//! on a host stable toolchain from inside this repo, and that the API
-//! surface Phase 1 needs (Client construction, password login, two-factor,
-//! unlock, sync, cipher enumerate+decrypt) still has the shape Ada assumed.
+//! web-companion: local HTTP server that lets the Bitwarden Web Vault sync
+//! credentials to the hardware key over a same-origin, token-gated API.
 //!
-//! This binary is deliberately never meant to be *run* against a real
-//! account for this spike -- no credentials are used or required. Every
-//! function below is real, callable code that must COMPILE against the
-//! pinned SDK rev; `main` never actually invokes the network paths.
+//! Phase 1 (this bead, ai-bitwarden-hw-key-eml.2): axum server skeleton
+//! only. Binds `127.0.0.1:3000` -- loopback ONLY, never `0.0.0.0` (the
+//! desktop emulator owns `:8080` on the same machine; see repo
+//! `CLAUDE.md`). No SDK login/sync logic yet -- see eml.3 (login) / eml.4
+//! (sync), which will build on the `Client` construction proved compiling
+//! against the pinned SDK rev in eml.1 and wired into `AppState` here.
 //!
-//! See ai-bitwarden-hw-key-eml.1 for the full findings report (signature
-//! deltas vs. Ada's design are called out inline below).
+//! See `crate::auth` for the token generation/delivery/enforcement design.
 
-use bitwarden_core::{
-    Client, ClientSettings, DeviceType,
-    auth::login::{
-        PasswordLoginRequest, PasswordLoginResponse, TwoFactorEmailRequest, TwoFactorProvider,
-        TwoFactorRequest,
-    },
-    key_management::crypto::{InitUserCryptoMethod, InitUserCryptoRequest},
-};
-use bitwarden_sync::{SyncClientExt, SyncRequest as BwSyncRequest};
-use bitwarden_vault::{CipherView, DecryptCipherListResult, VaultClientExt};
+mod auth;
+mod routes;
+mod state;
 
-// Confirms the cross-workspace path dependency on the sibling wire-format
-// crate resolves and its types are usable from web-companion. Aliased to
-// avoid colliding with `bitwarden_sync::SyncRequest`.
-use push_protocol::{Credential, SyncRequest as PushSyncRequest};
+use std::sync::Arc;
 
-/// Constructs a Client the way Phase 1 will: no credentials touched here.
-///
-/// FINDING: `Client::new` takes `Option<ClientSettings>`, not a builder
-/// pattern requiring explicit `.build()` -- matches Ada's assumption.
+use axum::{middleware, routing::get, Router};
+use bitwarden_core::{Client, ClientSettings, DeviceType};
+use tokio::{net::TcpListener, sync::Mutex};
+use tower::ServiceBuilder;
+use tower_http::services::ServeDir;
+
+use auth::{generate_api_token, require_bearer_token};
+use routes::{auth_status_stub, healthz, serve_index, static_dir};
+use state::{AppState, Session, TransportRegistry};
+
+/// Constructs a `Client` the way Phase 1 will (carried over from the
+/// eml.1 feasibility spike): no credentials touched, no network calls made
+/// here.
 fn build_client() -> Client {
     let settings = ClientSettings {
         identity_url: "https://identity.bitwarden.com".to_string(),
@@ -42,191 +39,143 @@ fn build_client() -> Client {
     Client::new(Some(settings))
 }
 
-/// FINDING (differs from Ada's design): there is no separate top-level
-/// `login()` vs. `unlock()` split for the master-password flow. A single
-/// `client.auth().login_password(&req)` call performs BOTH the network
-/// authentication AND (when the server's `userDecryptionOptions` include
-/// `masterPasswordUnlock`) the local crypto unlock, internally calling
-/// `initialize_user_crypto_master_password_unlock`. The explicit
-/// `client.crypto().initialize_user_crypto(InitUserCryptoRequest)` path
-/// (exercised separately below) exists for resuming a *cached* session
-/// (e.g. mobile persisted state) or non-master-password login methods, not
-/// for a fresh password login.
-async fn login_password_flow(client: &Client, email: &str, password: &str) -> PasswordLoginResponse {
-    let request = PasswordLoginRequest {
-        email: email.to_string(),
-        password: password.to_string(),
-        two_factor: None,
-    };
+/// Builds the axum `Router`. Split out from `main` so tests (see
+/// `src/tests.rs`) can construct the same app with a caller-supplied
+/// `AppState` (e.g. a known test token) and drive it in-process via
+/// `tower::ServiceExt::oneshot`, without binding a real socket.
+fn build_app(state: AppState) -> Router {
+    let api_routes = Router::new()
+        .route("/auth/status", get(auth_status_stub))
+        .layer(ServiceBuilder::new().layer(middleware::from_fn_with_state(
+            state.clone(),
+            require_bearer_token,
+        )));
 
-    // Not awaited/unwrapped for real in this spike -- reference the call so
-    // it type-checks against the pinned rev; never executed at runtime here.
-    if should_never_run() {
-        return client.auth().login_password(&request).await.expect(
-            "spike: login_password is never actually invoked without --run-live and creds",
-        );
-    }
-
-    unreachable!("compile-only reference path")
-}
-
-/// FINDING: two-factor is threaded through `PasswordLoginRequest.two_factor:
-/// Option<TwoFactorRequest>` on retry, not a separate "submit 2FA code" call
-/// against a pending-login handle. `TwoFactorEmailRequest` /
-/// `client.auth().send_two_factor_email(...)` is a distinct helper to
-/// (re)trigger an email OTP to be sent, not to submit one.
-async fn two_factor_flow(client: &Client, email: &str, password: &str) {
-    if should_never_run() {
-        // Ask the server to (re)send an email OTP.
-        let send_req = TwoFactorEmailRequest {
-            password: password.to_string(),
-            email: email.to_string(),
-        };
-        client
-            .auth()
-            .send_two_factor_email(&send_req)
-            .await
-            .expect("spike: never actually invoked");
-
-        // Retry the password login with the second factor attached.
-        let retry_req = PasswordLoginRequest {
-            email: email.to_string(),
-            password: password.to_string(),
-            two_factor: Some(TwoFactorRequest {
-                token: "000000".to_string(),
-                provider: TwoFactorProvider::Email,
-                remember: false,
-            }),
-        };
-        let _response = client
-            .auth()
-            .login_password(&retry_req)
-            .await
-            .expect("spike: never actually invoked");
-    }
-}
-
-/// FINDING: explicit unlock (as opposed to the login_password-embedded
-/// unlock above) requires the caller to already hold
-/// `WrappedAccountCryptographicState` + `MasterPasswordUnlockData` -- both
-/// come from a prior `login_password` response, they are NOT independently
-/// fetchable. This path is for re-initializing crypto in a fresh process
-/// against previously-persisted state, not a first-time login. Included
-/// here purely to confirm the type signature compiles; the values passed
-/// are placeholders that would panic if this ever ran, which it does not.
-#[allow(unreachable_code, unused_variables)]
-async fn unlock_flow(client: &Client) {
-    if should_never_run() {
-        let req: InitUserCryptoRequest = unimplemented!(
-            "spike: constructing a real InitUserCryptoRequest needs \
-             WrappedAccountCryptographicState + MasterPasswordUnlockData \
-             from a prior login response -- see finding above"
-        );
-        let _ = matches!(&req.method, InitUserCryptoMethod::MasterPasswordUnlock { .. });
-        client
-            .crypto()
-            .initialize_user_crypto(req)
-            .await
-            .expect("spike: never actually invoked");
-    }
-}
-
-/// FINDING (differs from Ada's design): `client.sync()` (via
-/// `SyncClientExt`) does NOT return the cipher list. It returns `Ok(bool)`
-/// (whether a full sync happened vs. was skipped by the revision-date
-/// check). Ciphers only become visible afterwards through
-/// `client.vault().ciphers().list()` / `.get_all()`, and THOSE calls
-/// require a `bitwarden_state::repository::Repository<Cipher>` to have been
-/// registered as client-managed state beforehand (`bitwarden-pm`'s
-/// `create_client_managed_repositories!` macro does this in the real
-/// clients). This compiles without a registered repository -- it would only
-/// fail at *runtime* (`GetCipherError::Repository`) -- so this spike proves
-/// the call signatures, not the runtime data flow. Registering a repository
-/// backend is Phase 1 scope, not this gate.
-async fn sync_and_list_flow(client: &Client) -> DecryptCipherListResult {
-    if should_never_run() {
-        let _did_sync: bool = client
-            .sync()
-            .sync(BwSyncRequest {
-                force: false,
-                exclude_subdomains: None,
-            })
-            .await
-            .expect("spike: never actually invoked");
-
-        let cipher_list_view = client
-            .vault()
-            .ciphers()
-            .list()
-            .await
-            .expect("spike: never actually invoked (no repository registered)");
-        return cipher_list_view;
-    }
-    unreachable!("compile-only reference path")
-}
-
-/// FINDING: full per-item decrypt-to-`CipherView` (as opposed to the
-/// lighter-weight `CipherListView` from `.list()`) goes through
-/// `client.vault().ciphers().get(cipher_id)` or `.get_all()`, both of which
-/// hit the same `Repository<Cipher>` + `KeyStore` path as `.list()` above.
-async fn decrypt_one_cipher(client: &Client, cipher_id: &str) -> CipherView {
-    if should_never_run() {
-        return client
-            .vault()
-            .ciphers()
-            .get(cipher_id)
-            .await
-            .expect("spike: never actually invoked");
-    }
-    unreachable!("compile-only reference path")
-}
-
-/// Confirms the cross-workspace `push-protocol` path dependency's types are
-/// usable unmodified alongside the SDK types above.
-fn push_protocol_roundtrip() -> PushSyncRequest {
-    PushSyncRequest {
-        credentials: vec![Credential {
-            id: uuid::Uuid::new_v4(),
-            name: "spike".to_string(),
-            username: "spike@example.com".to_string(),
-            password: "unused".to_string(),
-            uri: None,
-            notes: None,
-        }],
-    }
-}
-
-/// Always `false` at runtime; keeps the network/crypto-touching branches
-/// above as real, type-checked, dead code rather than deleting them. `main`
-/// never calls this with intent to execute the branches -- the compiler
-/// still fully checks them either way, which is the point of this spike.
-fn should_never_run() -> bool {
-    std::hint::black_box(false)
+    Router::new()
+        .route("/healthz", get(healthz))
+        .route("/", get(serve_index))
+        .route("/index.html", get(serve_index))
+        .nest("/api", api_routes)
+        .fallback_service(ServeDir::new(static_dir()))
+        .with_state(state)
 }
 
 #[tokio::main]
 async fn main() {
-    let client = build_client();
+    // Proves `Client::new` runs at startup (this bead's core claim) without
+    // touching credentials or the network. The result is intentionally
+    // discarded: a fresh process with no prior login has nowhere to put a
+    // `Client` yet -- `Session::LoggedOut` carries none by design (see
+    // `state::Session` docs). eml.3 will thread a real `Client` into
+    // `Session::Locked`/`Unlocked` once login exists.
+    let _client = build_client();
 
-    // Send + Sync + Clone check for axum State (see report): Client derives
-    // Clone, and wraps its only field in Arc<InternalClient>. We don't have
-    // InternalClient's definition available (private), so assert the bound
-    // we actually need for axum::extract::State here, which will fail to
-    // compile if it's ever untrue.
-    fn assert_send_sync_clone<T: Send + Sync + Clone>() {}
-    assert_send_sync_clone::<Client>();
+    let state = AppState {
+        session: Arc::new(Mutex::new(Session::LoggedOut)),
+        transports: TransportRegistry,
+        api_token: generate_api_token(),
+    };
 
-    if should_never_run() {
-        let _r1 = login_password_flow(&client, "spike@example.com", "unused").await;
-        two_factor_flow(&client, "spike@example.com", "unused").await;
-        unlock_flow(&client).await;
-        let _r2 = sync_and_list_flow(&client).await;
-        let _r3 = decrypt_one_cipher(&client, "00000000-0000-0000-0000-000000000000").await;
+    let app = build_app(state);
+
+    // Loopback ONLY -- never 0.0.0.0. See module docs.
+    let listener = TcpListener::bind("127.0.0.1:3000")
+        .await
+        .expect("failed to bind 127.0.0.1:3000");
+
+    axum::serve(listener, app)
+        .await
+        .expect("web-companion server exited unexpectedly");
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+    };
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    use super::*;
+
+    const TEST_TOKEN: &str = "test-token-do-not-use-in-prod";
+
+    fn test_state() -> AppState {
+        AppState {
+            session: Arc::new(Mutex::new(Session::LoggedOut)),
+            transports: TransportRegistry,
+            api_token: TEST_TOKEN.to_string(),
+        }
     }
 
-    let push_req = push_protocol_roundtrip();
-    println!(
-        "web-companion feasibility spike: client constructed, {} push-protocol credential(s) round-tripped, all SDK call sites type-check.",
-        push_req.credentials.len()
-    );
+    #[tokio::test]
+    async fn healthz_is_unauthenticated() {
+        let app = build_app(test_state());
+        let response = app
+            .oneshot(Request::get("/healthz").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn api_route_without_token_is_rejected() {
+        let app = build_app(test_state());
+        let response = app
+            .oneshot(
+                Request::get("/api/auth/status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn api_route_with_wrong_token_is_rejected() {
+        let app = build_app(test_state());
+        let response = app
+            .oneshot(
+                Request::get("/api/auth/status")
+                    .header("Authorization", "Bearer wrong-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn api_route_with_correct_token_reaches_handler() {
+        let app = build_app(test_state());
+        let response = app
+            .oneshot(
+                Request::get("/api/auth/status")
+                    .header("Authorization", format!("Bearer {TEST_TOKEN}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        // 501, not 401/403 -- proves the middleware let it through to the
+        // (deliberately unimplemented) stub handler.
+        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+    }
+
+    #[tokio::test]
+    async fn index_html_has_token_substituted_and_no_placeholder_left() {
+        let app = build_app(test_state());
+        let response = app
+            .oneshot(Request::get("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains(TEST_TOKEN));
+        assert!(!body.contains("__API_TOKEN__"));
+    }
 }
