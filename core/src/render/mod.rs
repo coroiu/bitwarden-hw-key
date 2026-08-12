@@ -14,6 +14,9 @@
 //! - [`list`]: [`VerticalList`], the one content widget this bead needs.
 //! - [`screen`]: [`Screen`], one entry in the navigation stack.
 //! - [`navigator`]: [`Navigator`], owning the screen stack.
+//! - [`secret_field`]: [`SecretField`] (bead `ai-bitwarden-hw-key-0v8.6`) —
+//!   the masked/revealed password-value rendering primitive used by
+//!   `crate::credential_detail_view::CredentialDetailView`.
 //!
 //! - [`theme`]: the M1 visual design language — the semantic color
 //!   palette, per-role `u8g2-fonts` accessors, `open_iconic` icon
@@ -45,6 +48,7 @@ pub mod framebuffer;
 pub mod list;
 pub mod navigator;
 pub mod screen;
+pub mod secret_field;
 pub mod theme;
 pub mod widget;
 
@@ -53,4 +57,5 @@ pub use framebuffer::FrameBuffer565;
 pub use list::{ListItem, VerticalList, ROW_HEIGHT};
 pub use navigator::Navigator;
 pub use screen::Screen;
+pub use secret_field::{SecretField, MASK_GLYPH_COUNT};
 pub use widget::{Action, ChromeContribution, ChromeStatus, FocusEvent, Widget};

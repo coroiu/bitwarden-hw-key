@@ -31,9 +31,17 @@
 //!   right-edge scrollbar, and a focused-row accent block. Replaces the
 //!   M0/0v8.3 placeholder `StoreBackedCredentialList` that used to live in
 //!   `app.rs`.
+//! - [`credential_detail_view::CredentialDetailView`] (M1, bead
+//!   `ai-bitwarden-hw-key-0v8.6`): the credential detail screen pushed by
+//!   `CredentialListView`'s `on_activate` seam — a single-container
+//!   focusable widget managing field focus (USERNAME/PASSWORD/WEBSITE/
+//!   NOTES) internally, reading the credential live by id from the
+//!   `VaultStore`, with a "gone" state if it's deleted upstream while
+//!   viewing.
 //! - [`app::App`]: the platform-free application state — a `Navigator`,
 //!   built once, over a `VaultStore`-backed root credential list that
-//!   `App::step` keeps live-updated in place.
+//!   `App::step` keeps live-updated in place, wired to push a
+//!   `CredentialDetailView` on activation.
 //! - [`run::run`]: the unified, `Platform`-generic main loop (W7, this
 //!   bead) that drives an `App` — the one loop shared by all three run
 //!   modes (headless, windowed, real-target).
@@ -46,6 +54,7 @@
 //! See: .planning/decisions/2026-08-11-portability-boundary-and-workspace-split.md
 
 pub mod app;
+pub mod credential_detail_view;
 pub mod credential_list_view;
 pub mod input;
 pub mod platform;
@@ -56,6 +65,7 @@ pub mod vault_item;
 pub mod vault_store;
 
 pub use app::App;
+pub use credential_detail_view::CredentialDetailView;
 pub use credential_list_view::CredentialListView;
 pub use input::NavIntent;
 pub use run::run;
