@@ -148,7 +148,8 @@ mod tests {
     use super::*;
     use std::convert::Infallible;
 
-    use embedded_graphics::pixelcolor::{Rgb565, WebColors};
+    use crate::render::theme::palette;
+    use embedded_graphics::pixelcolor::Rgb565;
     use embedded_graphics::prelude::Point;
     use uuid::Uuid;
 
@@ -202,17 +203,17 @@ mod tests {
         // -> render), not directly against `Navigator`.
         let mut app = App::new(320, 170, vec![item("GitHub"), item("AWS"), item("Postgres")]);
 
-        // x=250: past the 3px focus-accent bar at x in [0,3) *and* past
-        // any of these short labels' text, so it samples the row's plain
-        // fill rather than the accent stripe or a glyph pixel.
+        // x=250: past the 4px selection accent bar *and* past any of
+        // these short labels' text, so it samples the row's plain
+        // elevated fill rather than the accent stripe or a glyph pixel.
         let frame_0 = app.render().pixel(Point::new(250, 18));
-        assert_eq!(frame_0, Rgb565::CSS_DARK_SLATE_BLUE, "row 0 should start selected");
+        assert_eq!(frame_0, palette::SURFACE_ELEVATED, "row 0 should start selected");
 
         app.handle_input(vec![NavIntent::Next]);
         assert!(app.dirty(), "moving selection should mark the app dirty");
 
         let frame_1_row_0 = app.render().pixel(Point::new(250, 18));
-        assert_ne!(frame_1_row_0, Rgb565::CSS_DARK_SLATE_BLUE, "row 0 should no longer be selected");
+        assert_ne!(frame_1_row_0, palette::SURFACE_ELEVATED, "row 0 should no longer be selected");
     }
 
     #[test]

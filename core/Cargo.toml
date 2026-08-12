@@ -18,6 +18,7 @@ rust-version = "1.77"
 embedded-graphics = "0.8.2"
 embedded-graphics-framebuf = "0.5.0"
 serde = { version = "1.0", features = ["derive"] }
+u8g2-fonts = { version = "0.5.2", features = ["embedded_graphics_textstyle"] }
 uuid = { version = "1.8.0", features = ["v4"] }
 
 [dev-dependencies]

@@ -22,11 +22,8 @@
 
 use std::convert::Infallible;
 
-use embedded_graphics::draw_target::DrawTarget;
-use embedded_graphics::pixelcolor::Rgb565;
-use embedded_graphics::prelude::{Primitive, Size};
-use embedded_graphics::primitives::{PrimitiveStyle, Rectangle};
-use embedded_graphics::Drawable;
+use embedded_graphics::prelude::Size;
+use embedded_graphics::primitives::Rectangle;
 
 use crate::input::NavIntent;
 
@@ -71,51 +68,6 @@ pub enum Action {
     /// No navigation-stack action.
     #[default]
     None,
-}
-
-/// Width, in pixels, of the left accent bar [`draw_focus_block`] draws on
-/// top of its full-area fill.
-pub const FOCUS_ACCENT_WIDTH: u32 = 3;
-
-/// Draws the shared "this is the focused thing" visual: a full-`area` fill
-/// in `fill_color`, then a [`FOCUS_ACCENT_WIDTH`]-px accent bar in
-/// `accent_color` along `area`'s left edge.
-///
-/// Extracted here (rather than inlined once in `credential_list_view.rs`)
-/// because it is deliberately *not* list-row-specific: `CredentialListView`
-/// uses it for a focused row per bead `ai-bitwarden-hw-key-0v8.4`, and bead
-/// `ai-bitwarden-hw-key-0v8.6`'s detail view is expected to reuse it for a
-/// focused field, so the "focused" visual language stays identical across
-/// both screens rather than drifting into two hand-rolled variants.
-///
-/// Generic over `D: DrawTarget<Color = Rgb565, Error = Infallible>` (rather
-/// than the concrete `FrameBuffer565`) so a caller drawing into a
-/// `DrawTargetExt::clipped()` sub-region (as `CredentialListView` does, to
-/// clip a row to its list's content width) can pass that clipped target
-/// directly, the same way `Drawable::draw` calls do elsewhere in this
-/// module.
-///
-/// # Errors
-///
-/// Returns `Infallible`'s uninhabited variant in practice — see
-/// `Widget::render`'s doc comment for why the `Result` return exists at
-/// all.
-pub fn draw_focus_block<D>(
-    area: Rectangle,
-    fill_color: Rgb565,
-    accent_color: Rgb565,
-    target: &mut D,
-) -> Result<(), Infallible>
-where
-    D: DrawTarget<Color = Rgb565, Error = Infallible>,
-{
-    area.into_styled(PrimitiveStyle::with_fill(fill_color)).draw(target)?;
-
-    let accent_width = FOCUS_ACCENT_WIDTH.min(area.size.width);
-    let accent = Rectangle::new(area.top_left, Size::new(accent_width, area.size.height));
-    accent.into_styled(PrimitiveStyle::with_fill(accent_color)).draw(target)?;
-
-    Ok(())
 }
 
 /// A retained-mode UI element. Implementors own their own state (selection

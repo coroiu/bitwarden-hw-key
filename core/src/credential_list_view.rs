@@ -59,18 +59,18 @@ use std::rc::Rc;
 
 use embedded_graphics::{
     draw_target::DrawTargetExt,
-    mono_font::{ascii::FONT_6X10, MonoTextStyle},
-    pixelcolor::{Rgb565, WebColors},
-    prelude::{Point, Primitive, RgbColor, Size},
+    pixelcolor::Rgb565,
+    prelude::{Point, Primitive, Size},
     primitives::{PrimitiveStyle, Rectangle},
-    text::Text,
     Drawable,
 };
+use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
 use uuid::Uuid;
 
 use crate::input::NavIntent;
-use crate::render::list::{label_baseline_offset, scroll_offset_for_selection, sublabel_baseline_offset};
-use crate::render::{draw_focus_block, Action, FocusEvent, FrameBuffer565, Widget, ROW_HEIGHT};
+use crate::render::list::{name_top_offset, scroll_offset_for_selection, username_top_offset};
+use crate::render::theme::{self, font, palette};
+use crate::render::{Action, FocusEvent, FrameBuffer565, Widget, ROW_HEIGHT};
 use crate::vault_item::VaultItem;
 use crate::vault_store::{SyncStatus, VaultStore};
 
@@ -256,10 +256,8 @@ impl CredentialListView {
 
         let scroll = selected.map_or(0, |index| scroll_offset_for_selection(index, area.size.height));
 
-        let text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::WHITE);
-        let sub_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_GRAY);
-        let fill_color = Rgb565::CSS_DARK_SLATE_BLUE;
-        let accent_color = Rgb565::CSS_DEEP_SKY_BLUE;
+        let name_font = font::name();
+        let username_font = font::username();
 
         {
             let mut clipped = target.clipped(&rows_area);
@@ -279,22 +277,26 @@ impl CredentialListView {
                 );
 
                 if self.focused && selected == Some(index) {
-                    draw_focus_block(row_rect, fill_color, accent_color, &mut clipped)?;
+                    theme::draw_selection(row_rect, &mut clipped)?;
                 }
 
-                Text::new(
-                    &item.name,
-                    Point::new(rows_area.top_left.x + 4, row_top + label_baseline_offset()),
-                    text_style,
-                )
-                .draw(&mut clipped)?;
+                let _ = name_font.render_aligned(
+                    item.name.as_str(),
+                    Point::new(rows_area.top_left.x + 4, row_top + name_top_offset()),
+                    VerticalPosition::Top,
+                    HorizontalAlignment::Left,
+                    FontColor::Transparent(palette::TEXT_PRIMARY),
+                    &mut clipped,
+                );
 
-                Text::new(
-                    &item.username,
-                    Point::new(rows_area.top_left.x + 4, row_top + sublabel_baseline_offset()),
-                    sub_style,
-                )
-                .draw(&mut clipped)?;
+                let _ = username_font.render_aligned(
+                    item.username.as_str(),
+                    Point::new(rows_area.top_left.x + 4, row_top + username_top_offset()),
+                    VerticalPosition::Top,
+                    HorizontalAlignment::Left,
+                    FontColor::Transparent(palette::TEXT_SECONDARY),
+                    &mut clipped,
+                );
             }
         }
 
@@ -322,7 +324,7 @@ fn render_scrollbar(
     let track_x = area.top_left.x + area.size.width as i32 - SCROLLBAR_WIDTH as i32;
 
     let track = Rectangle::new(Point::new(track_x, area.top_left.y), Size::new(SCROLLBAR_WIDTH, viewport_height));
-    track.into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_DIM_GRAY)).draw(target)?;
+    track.into_styled(PrimitiveStyle::with_fill(palette::DIVIDER)).draw(target)?;
 
     let thumb_height = (u64::from(viewport_height) * u64::from(viewport_height) / u64::from(total_height))
         .max(u64::from(MIN_THUMB_HEIGHT)) as u32;
@@ -340,44 +342,54 @@ fn render_scrollbar(
         Point::new(track_x, area.top_left.y + thumb_top as i32),
         Size::new(SCROLLBAR_WIDTH, thumb_height),
     );
-    thumb.into_styled(PrimitiveStyle::with_fill(Rgb565::CSS_LIGHT_SLATE_GRAY)).draw(target)
+    thumb.into_styled(PrimitiveStyle::with_fill(palette::TEXT_SECONDARY)).draw(target)
 }
 
 /// Draws a two-line content message (headline + optional subline) for the
 /// non-list content states (waiting/empty/error). Not list-specific, but
-/// kept private to this module rather than promoted to `render::widget`
-/// (unlike `draw_focus_block`) — nothing outside `CredentialListView`
-/// needs it yet, and it has no framework-level generality (it's a fixed
-/// two-line-of-`FONT_6X10` layout, not a general text component).
+/// kept private to this module rather than promoted to `render::theme`
+/// (unlike `draw_selection`) — nothing outside `CredentialListView` needs
+/// it yet, and it has no framework-level generality (it's a fixed
+/// two-line layout, not a general text component).
+///
+/// Returns `()`, not `Result<(), Infallible>` like most of this module's
+/// draw helpers: every draw call inside deliberately discards
+/// `render_aligned`'s `Result` (see `font`'s module doc — unrenderable
+/// glyphs are skipped, not propagated as an error), so there is truly
+/// nothing left that can fail here to report. Callers in `Widget::render`
+/// wrap this call with an explicit `Ok(())` to match the trait's
+/// signature.
 fn render_message(
     area: Rectangle,
     headline: &str,
     headline_color: Rgb565,
     subline: Option<&str>,
     target: &mut FrameBuffer565,
-) -> Result<(), Infallible> {
+) {
     let mut clipped = target.clipped(&area);
 
-    let headline_style = MonoTextStyle::new(&FONT_6X10, headline_color);
-    let subline_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_GRAY);
-
-    Text::new(
+    let _ = font::name().render_aligned(
         headline,
-        Point::new(area.top_left.x + 8, area.top_left.y + MESSAGE_TOP_PADDING + label_baseline_offset()),
-        headline_style,
-    )
-    .draw(&mut clipped)?;
+        Point::new(area.top_left.x + 8, area.top_left.y + MESSAGE_TOP_PADDING + name_top_offset()),
+        VerticalPosition::Top,
+        HorizontalAlignment::Left,
+        FontColor::Transparent(headline_color),
+        &mut clipped,
+    );
 
     if let Some(subline) = subline {
-        Text::new(
+        let _ = font::username().render_aligned(
             subline,
-            Point::new(area.top_left.x + 8, area.top_left.y + MESSAGE_TOP_PADDING + sublabel_baseline_offset()),
-            subline_style,
-        )
-        .draw(&mut clipped)?;
+            Point::new(
+                area.top_left.x + 8,
+                area.top_left.y + MESSAGE_TOP_PADDING + username_top_offset(),
+            ),
+            VerticalPosition::Top,
+            HorizontalAlignment::Left,
+            FontColor::Transparent(palette::TEXT_SECONDARY),
+            &mut clipped,
+        );
     }
-
-    Ok(())
 }
 
 impl Widget for CredentialListView {
@@ -438,16 +450,23 @@ impl Widget for CredentialListView {
 
         match content_state(items.len(), status.as_ref()) {
             ContentState::List => self.render_list(area, &items, target),
-            ContentState::Waiting => render_message(area, "Waiting for sync...", Rgb565::WHITE, None, target),
-            ContentState::Empty => render_message(
-                area,
-                "No credentials yet",
-                Rgb565::WHITE,
-                Some("Sync from your companion app"),
-                target,
-            ),
+            ContentState::Waiting => {
+                render_message(area, "Waiting for sync...", palette::TEXT_PRIMARY, None, target);
+                Ok(())
+            }
+            ContentState::Empty => {
+                render_message(
+                    area,
+                    "No credentials yet",
+                    palette::TEXT_PRIMARY,
+                    Some("Sync from your companion app"),
+                    target,
+                );
+                Ok(())
+            }
             ContentState::Error(message) => {
-                render_message(area, "Sync error", Rgb565::CSS_TOMATO, Some(message), target)
+                render_message(area, "Sync error", palette::STATUS_ERROR, Some(message), target);
+                Ok(())
             }
         }
     }
@@ -589,12 +608,12 @@ mod tests {
         navigator.render(&mut fb).unwrap();
 
         let chrome = compute_chrome(fb.size());
-        // x=250: past the 3px focus-accent bar and past these short
-        // labels' text, so it samples the row's plain fill.
+        // x=250: past the 4px selection accent bar and past these short
+        // labels' text, so it samples the row's plain elevated fill.
         let row0_highlight = fb.pixel(Point::new(250, chrome.content.top_left.y + 2));
         assert_eq!(
             row0_highlight,
-            Rgb565::CSS_DARK_SLATE_BLUE,
+            palette::SURFACE_ELEVATED,
             "row 0 should be highlighted as selected immediately once items exist, \
              with no extra focus-cycling input needed"
         );
@@ -604,7 +623,7 @@ mod tests {
         navigator.dispatch(NavIntent::Next);
         navigator.render(&mut fb).unwrap();
         let row0_after_move = fb.pixel(Point::new(250, chrome.content.top_left.y + 2));
-        assert_ne!(row0_after_move, Rgb565::CSS_DARK_SLATE_BLUE);
+        assert_ne!(row0_after_move, palette::SURFACE_ELEVATED);
     }
 
     #[test]
@@ -615,11 +634,12 @@ mod tests {
         view.render(AREA, &mut fb).unwrap();
 
         // No list rows: no selection-fill pixel anywhere, but the message
-        // did draw something (white text) into the content area.
-        let any_selected_fill = fb.pixels().any(|p| p.1 == Rgb565::CSS_DARK_SLATE_BLUE);
+        // did draw something (primary-text-colored ink) into the content
+        // area.
+        let any_selected_fill = fb.pixels().any(|p| p.1 == palette::SURFACE_ELEVATED);
         assert!(!any_selected_fill);
-        let any_white = fb.pixels().any(|p| p.1 == Rgb565::WHITE);
-        assert!(any_white, "the waiting message's headline text should have drawn something");
+        let any_headline_ink = fb.pixels().any(|p| p.1 == palette::TEXT_PRIMARY);
+        assert!(any_headline_ink, "the waiting message's headline text should have drawn something");
     }
 
     #[test]
@@ -646,7 +666,7 @@ mod tests {
         let mut fb = FrameBuffer565::new(320, 170);
         view.render(AREA, &mut fb).unwrap();
 
-        let any_error_color = fb.pixels().any(|p| p.1 == Rgb565::CSS_TOMATO);
+        let any_error_color = fb.pixels().any(|p| p.1 == palette::STATUS_ERROR);
         assert!(any_error_color, "the error headline should render in its distinct color");
     }
 
@@ -723,7 +743,7 @@ mod tests {
         let scrollbar_x = (AREA.size.width - 1) as i32;
         let any_scrollbar_pixel = (AREA.top_left.y..(AREA.top_left.y + AREA.size.height as i32))
             .map(|y| fb.pixel(Point::new(scrollbar_x, y)))
-            .any(|color| color == Rgb565::CSS_DIM_GRAY || color == Rgb565::CSS_LIGHT_SLATE_GRAY);
+            .any(|color| color == palette::DIVIDER || color == palette::TEXT_SECONDARY);
         assert!(any_scrollbar_pixel, "a long list should paint a scrollbar track/thumb at the right edge");
     }
 

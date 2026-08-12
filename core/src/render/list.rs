@@ -12,17 +12,15 @@ use std::convert::Infallible;
 
 use embedded_graphics::{
     draw_target::DrawTargetExt,
-    mono_font::{ascii::FONT_6X10, MonoTextStyle},
-    pixelcolor::{Rgb565, WebColors},
-    prelude::{Point, Primitive, RgbColor, Size},
-    primitives::{PrimitiveStyle, Rectangle},
-    text::Text,
-    Drawable,
+    prelude::{Point, Size},
+    primitives::Rectangle,
 };
+use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
 
 use crate::input::NavIntent;
 
 use super::framebuffer::FrameBuffer565;
+use super::theme::{self, font, palette};
 use super::widget::{Action, FocusEvent, Widget};
 
 /// A single displayable row. Display-only: no identifiers, no domain
@@ -49,53 +47,69 @@ impl ListItem {
     }
 }
 
-/// `MonoTextStyle`/`Text` position the glyph at its *baseline* by default
-/// (`Baseline::Alphabetic`), not its top-left. For `FONT_6X10`,
-/// `baseline == 7`: the glyph box is 10px tall, split 7px above the
-/// baseline (ascent) and `10 - 7 = 3px` below it (descent). Getting this
-/// wrong is exactly what caused the row-overflow bug this module was
-/// fixed for (see `ROW_HEIGHT`'s doc comment) — computed from the font's
-/// own metrics here instead of re-deriving/hardcoding it at each call
-/// site.
-pub(crate) const FONT_ASCENT: u32 = FONT_6X10.baseline;
-pub(crate) const FONT_DESCENT: u32 = FONT_6X10.character_size.height - FONT_6X10.baseline;
+/// Vertical padding above the name line and below the username line, and
+/// the gap between the two lines.
+const ROW_PADDING: i32 = 1;
+const LINE_GAP: i32 = 1;
 
-/// Vertical padding above the label and below the sublabel, and the gap
-/// between the two lines.
-pub(crate) const ROW_PADDING: u32 = 1;
-pub(crate) const LINE_GAP: u32 = 1;
+/// Worst-case pixel footprint (leading + ink height, including
+/// descenders) of a single line rendered with [`font::name`]/
+/// [`font::username`] from a `VerticalPosition::Top`-anchored position —
+/// i.e. how much vertical room a `render_aligned(.., VerticalPosition::Top,
+/// ..)` call at row-relative y=0 actually occupies in the worst case.
+///
+/// These are measured constants, not something `u8g2-fonts` can compute at
+/// compile time (`FontRenderer::get_rendered_dimensions*` take `&self` and
+/// aren't `const fn`) — derived once via a throwaway probe
+/// (`core/examples/dim_probe.rs`, run manually, not part of the build)
+/// against `"gjpqy"` (all five ASCII descenders) rendered in each font,
+/// then hardcoded here the same way the retired `FONT_ASCENT`/
+/// `FONT_DESCENT` constants were hardcoded from `FONT_6X10`'s metrics.
+///
+/// Using the worst case (not the specific credential name/username being
+/// rendered) is deliberate: this guards every possible name/username the
+/// same way `ROW_HEIGHT`'s previous, font-metric-derived formula did,
+/// rather than only the non-descender demo strings the design-review
+/// spike's mockup happened to use (its "+2/+15" row offsets were tuned
+/// against `"GitHub"`/`"Amazon Web Services"`-style names with no
+/// descenders, which this bead's real credential data can't guarantee).
+const NAME_LINE_FOOTPRINT: i32 = 17;
+const USERNAME_LINE_FOOTPRINT: i32 = 15;
 
-/// Pixel height of a single row (padding + label line + gap + sublabel
+/// Pixel height of a single row (padding + name line + gap + username
 /// line + padding). Fixed, like the chrome bar heights in `chrome.rs` — a
 /// pixel budget, not a screen-resolution assumption.
 ///
-/// Derived from `FONT_6X10`'s real metrics so the two text baselines
-/// (`label_baseline_offset`/`sublabel_baseline_offset` below) always fit
-/// entirely inside `[0, ROW_HEIGHT)`. A previous version hardcoded `20`
-/// with baselines at `+12`/`+21`, which put the sublabel's descent 4px
-/// past the row's bottom edge — visually, the *next* row's selection
-/// highlight (opaque, drawn on top) ate the tail of this row's sublabel.
-/// `render_png_dump.rs`'s `text_never_bleeds_past_a_rows_bottom_padding`
-/// test guards against this regressing.
+/// Grew from `FONT_6X10`'s 23px to accommodate the larger, proportional
+/// `helvB12`/`helvR10` theme fonts (bead `ai-bitwarden-hw-key-0v8.8`) —
+/// expected, not a regression: bigger, legible fonts need more room.
+/// Still derived so the two lines' worst-case ink always fits entirely
+/// inside `[0, ROW_HEIGHT)`, the same guarantee the original `ROW_HEIGHT`
+/// doc comment describes and `render_png_dump.rs`'s
+/// `text_never_bleeds_past_a_rows_bottom_padding` test still enforces.
 pub const ROW_HEIGHT: u32 =
-    ROW_PADDING + FONT_ASCENT + FONT_DESCENT + LINE_GAP + FONT_ASCENT + FONT_DESCENT + ROW_PADDING;
+    (ROW_PADDING + NAME_LINE_FOOTPRINT + LINE_GAP + USERNAME_LINE_FOOTPRINT + ROW_PADDING) as u32;
 
-/// Baseline y-offset (from a row's top edge) for the label line.
+/// Row-relative Y offset for the name line's
+/// `render_aligned(.., VerticalPosition::Top, ..)` call.
 ///
 /// `pub(crate)`: shared with `credential_list_view.rs`, which draws its own
-/// rows (scrollbar + focus-block accent) rather than delegating to
-/// `VerticalList`, but must reuse this exact font-metrics-derived math to
-/// avoid reintroducing the row-overflow bug `ROW_HEIGHT`'s doc comment
-/// describes.
-pub(crate) fn label_baseline_offset() -> i32 {
-    (ROW_PADDING + FONT_ASCENT) as i32
+/// rows (scrollbar + selection accent) rather than delegating to
+/// `VerticalList`, but must reuse this exact offset to avoid reintroducing
+/// the row-overflow bug `ROW_HEIGHT`'s doc comment describes. Plain
+/// layout constants now, not baseline-derived math — `u8g2-fonts`'
+/// `VerticalPosition::Top` does the ascent/descent arithmetic internally,
+/// which is the whole point of retiring the old `FONT_ASCENT`/
+/// `FONT_DESCENT`/baseline-offset math this replaces.
+pub(crate) const fn name_top_offset() -> i32 {
+    ROW_PADDING
 }
 
-/// Baseline y-offset (from a row's top edge) for the sublabel line —
-/// directly below the label line's descent, plus `LINE_GAP`. `pub(crate)`:
-/// see `label_baseline_offset`'s doc comment.
-pub(crate) fn sublabel_baseline_offset() -> i32 {
-    label_baseline_offset() + (FONT_DESCENT + LINE_GAP + FONT_ASCENT) as i32
+/// Row-relative Y offset for the username line's `render_aligned` call —
+/// directly below the name line's worst-case footprint, plus `LINE_GAP`.
+/// `pub(crate)`: see [`name_top_offset`]'s doc comment.
+pub(crate) const fn username_top_offset() -> i32 {
+    name_top_offset() + NAME_LINE_FOOTPRINT + LINE_GAP
 }
 
 /// Scroll offset (in pixels) that keeps row `selected` within
@@ -253,9 +267,8 @@ impl Widget for VerticalList {
         let mut clipped = target.clipped(&area);
 
         let scroll = self.scroll_for_viewport(area.size.height);
-        let text_style = MonoTextStyle::new(&FONT_6X10, Rgb565::WHITE);
-        let sub_style = MonoTextStyle::new(&FONT_6X10, Rgb565::CSS_GRAY);
-        let selected_fill = PrimitiveStyle::with_fill(Rgb565::CSS_DARK_SLATE_BLUE);
+        let name_font = font::name();
+        let username_font = font::username();
 
         for (index, item) in self.items.iter().enumerate() {
             let row_top =
@@ -276,23 +289,27 @@ impl Widget for VerticalList {
             );
 
             if self.focused && index == self.selected {
-                row_rect.into_styled(selected_fill).draw(&mut clipped)?;
+                theme::draw_selection(row_rect, &mut clipped)?;
             }
 
-            Text::new(
-                &item.label,
-                Point::new(area.top_left.x + 4, row_top + label_baseline_offset()),
-                text_style,
-            )
-            .draw(&mut clipped)?;
+            let _ = name_font.render_aligned(
+                item.label.as_str(),
+                Point::new(area.top_left.x + 4, row_top + name_top_offset()),
+                VerticalPosition::Top,
+                HorizontalAlignment::Left,
+                FontColor::Transparent(palette::TEXT_PRIMARY),
+                &mut clipped,
+            );
 
             if let Some(sublabel) = &item.sublabel {
-                Text::new(
-                    sublabel,
-                    Point::new(area.top_left.x + 4, row_top + sublabel_baseline_offset()),
-                    sub_style,
-                )
-                .draw(&mut clipped)?;
+                let _ = username_font.render_aligned(
+                    sublabel.as_str(),
+                    Point::new(area.top_left.x + 4, row_top + username_top_offset()),
+                    VerticalPosition::Top,
+                    HorizontalAlignment::Left,
+                    FontColor::Transparent(palette::TEXT_SECONDARY),
+                    &mut clipped,
+                );
             }
         }
 

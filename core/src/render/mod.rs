@@ -15,16 +15,17 @@
 //! - [`screen`]: [`Screen`], one entry in the navigation stack.
 //! - [`navigator`]: [`Navigator`], owning the screen stack.
 //!
+//! - [`theme`]: the M1 visual design language — the semantic color
+//!   palette, per-role `u8g2-fonts` accessors, `open_iconic` icon
+//!   codepoints, and the shared chip/selection drawing primitives (bead
+//!   `ai-bitwarden-hw-key-0v8.8`). `screen`/`list`/`credential_list_view`
+//!   render through this instead of `embedded-graphics`' built-in
+//!   `MonoFont`/`WebColors`.
+//!
 //! What's deliberately NOT here yet (later beads, see the bead's explicit
 //! out-of-scope list):
 //! - Any `DisplaySurface`/`InputSource`/`Clock`/`Storage` *implementation*
 //!   (those traits themselves are frozen in `crate::platform` from W1).
-//! - `u8g2-fonts` vector text — this bead uses `embedded-graphics`' built-in
-//!   `MonoFont` (`FONT_6X10`) instead. The ADR calls for `u8g2-fonts`
-//!   eventually (i18n glyph support); swapping the font backend later is a
-//!   `mono_font` -> `u8g2_fonts` change local to `list.rs`/`screen.rs`, not
-//!   a `Widget`/`Navigator` API change, so deferring it doesn't block
-//!   anything downstream.
 
 // `embedded-graphics` represents position as `Point` (`i32`) and extent as
 // `Size` (`u32`) — a mismatch baked into the upstream library, not
@@ -44,6 +45,7 @@ pub mod framebuffer;
 pub mod list;
 pub mod navigator;
 pub mod screen;
+pub mod theme;
 pub mod widget;
 
 pub use chrome::{compute_chrome, ChromeLayout};
@@ -51,4 +53,4 @@ pub use framebuffer::FrameBuffer565;
 pub use list::{ListItem, VerticalList, ROW_HEIGHT};
 pub use navigator::Navigator;
 pub use screen::Screen;
-pub use widget::{draw_focus_block, Action, FocusEvent, Widget, FOCUS_ACCENT_WIDTH};
+pub use widget::{Action, FocusEvent, Widget};

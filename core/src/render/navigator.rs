@@ -14,12 +14,11 @@ use std::convert::Infallible;
 
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::OriginDimensions;
-use embedded_graphics::pixelcolor::Rgb565;
-use embedded_graphics::prelude::RgbColor;
 
 use super::chrome::compute_chrome;
 use super::framebuffer::FrameBuffer565;
 use super::screen::Screen;
+use super::theme::palette;
 use super::widget::Action;
 use crate::input::NavIntent;
 
@@ -127,7 +126,7 @@ impl Navigator {
     /// Renders the current screen into `target`, computing chrome regions
     /// from whatever size `target` happens to be.
     ///
-    /// Clears `target` to black first. This matters because, per the
+    /// Clears `target` to [`palette::BACKGROUND`] first. This matters because, per the
     /// presentation-surface ADR, the app core owns a single long-lived
     /// framebuffer that gets re-rendered into every frame rather than
     /// reallocated — without an explicit clear, a widget that doesn't
@@ -144,7 +143,7 @@ impl Navigator {
     /// `Infallible`. The `Result` return exists so this can use `?`
     /// against embedded-graphics `Drawable::draw` calls internally.
     pub fn render(&self, target: &mut FrameBuffer565) -> Result<(), Infallible> {
-        target.clear(Rgb565::BLACK)?;
+        target.clear(palette::BACKGROUND)?;
         let chrome = compute_chrome(target.size());
         self.current().render(&chrome, target)
     }
@@ -154,8 +153,7 @@ impl Navigator {
 mod tests {
     use super::*;
     use crate::render::list::{ListItem, VerticalList};
-    use embedded_graphics::pixelcolor::{Rgb565, WebColors};
-    use embedded_graphics::prelude::{OriginDimensions, Point, RgbColor, Size};
+    use embedded_graphics::prelude::{OriginDimensions, Point, Size};
 
     fn list_screen(title: &str, n: usize) -> Screen {
         let items = (0..n).map(|i| ListItem::new(format!("{title}-item-{i}"))).collect();
@@ -257,14 +255,16 @@ mod tests {
         let mut nav = Navigator::new(list_screen("Vault", 3));
 
         nav.render(&mut fb).unwrap();
-        let row0_highlighted = fb.pixel(Point::new(2, 18));
-        assert_eq!(row0_highlighted, Rgb565::CSS_DARK_SLATE_BLUE, "row 0 starts selected");
+        // x=20: past the 4px selection accent bar, so this samples the
+        // row's plain elevated fill rather than the accent stripe.
+        let row0_highlighted = fb.pixel(Point::new(20, 18));
+        assert_eq!(row0_highlighted, palette::SURFACE_ELEVATED, "row 0 starts selected");
 
         nav.dispatch(NavIntent::Next);
         nav.render(&mut fb).unwrap();
-        let row0_after_move = fb.pixel(Point::new(2, 18));
+        let row0_after_move = fb.pixel(Point::new(20, 18));
         assert_ne!(
-            row0_after_move, Rgb565::CSS_DARK_SLATE_BLUE,
+            row0_after_move, palette::SURFACE_ELEVATED,
             "row 0's stale highlight from the first render must not survive into the second"
         );
     }
@@ -275,9 +275,9 @@ mod tests {
         let nav = Navigator::new(list_screen("Vault", 3));
         nav.render(&mut fb).unwrap();
         assert_eq!(fb.size(), Size::new(320, 170));
-        // Sanity: at least one non-black pixel was drawn somewhere (title
-        // bar background), i.e. rendering actually did something.
-        let any_non_black = fb.pixels().any(|p| p.1 != Rgb565::BLACK);
-        assert!(any_non_black);
+        // Sanity: the title bar's surface fill was drawn somewhere, i.e.
+        // rendering actually did something (not just the background clear).
+        let any_title_bar_surface = fb.pixels().any(|p| p.1 == palette::SURFACE);
+        assert!(any_title_bar_surface);
     }
 }
