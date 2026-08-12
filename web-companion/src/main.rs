@@ -16,6 +16,8 @@ mod auth;
 mod auth_routes;
 mod routes;
 mod state;
+mod vault;
+mod vault_routes;
 
 use std::sync::Arc;
 
@@ -44,6 +46,9 @@ fn build_app(state: AppState) -> Router {
         .route("/auth/2fa", post(auth_routes::two_factor))
         .route("/auth/lock", post(auth_routes::lock))
         .route("/auth/logout", post(auth_routes::logout))
+        .route("/vault/sync", post(vault_routes::sync))
+        .route("/vault/list", get(vault_routes::list))
+        .route("/vault/status", get(vault_routes::status))
         .layer(ServiceBuilder::new().layer(middleware::from_fn_with_state(
             state.clone(),
             require_bearer_token,
@@ -64,6 +69,7 @@ async fn main() {
         session: Arc::new(Mutex::new(Session::LoggedOut)),
         transports: TransportRegistry,
         api_token: generate_api_token(),
+        vault_credentials: state::VaultCredentialStore::default(),
     };
 
     let app = build_app(state);
@@ -96,6 +102,7 @@ mod tests {
             session: Arc::new(Mutex::new(Session::LoggedOut)),
             transports: TransportRegistry,
             api_token: TEST_TOKEN.to_string(),
+            vault_credentials: state::VaultCredentialStore::default(),
         }
     }
 
@@ -262,6 +269,34 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = body_json(response).await;
         assert_eq!(body["status"], "logged_out");
+    }
+
+    #[tokio::test]
+    async fn vault_list_without_unlocked_session_is_conflict() {
+        let response = authed_request("GET", "/api/vault/list", None).await;
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn vault_sync_without_unlocked_session_is_conflict() {
+        let response = authed_request("POST", "/api/vault/sync", None).await;
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn vault_status_without_unlocked_session_is_conflict() {
+        let response = authed_request("GET", "/api/vault/status", None).await;
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn vault_routes_require_bearer_token() {
+        let app = build_app(test_state());
+        let response = app
+            .oneshot(Request::get("/api/vault/list").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]

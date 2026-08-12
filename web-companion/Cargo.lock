@@ -3783,11 +3783,14 @@ dependencies = [
 name = "web-companion"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
  "bitwarden-api-api",
  "bitwarden-core",
+ "bitwarden-crypto",
  "bitwarden-sync",
  "bitwarden-vault",
+ "chrono",
  "http-body-util",
  "push-protocol",
  "serde",
