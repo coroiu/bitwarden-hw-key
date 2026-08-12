@@ -41,10 +41,3 @@ pub async fn serve_index(State(state): State<AppState>) -> Response {
         }
     }
 }
-
-/// Stub `/api/auth/status` -- exists only to exercise the auth middleware
-/// (see `crate::auth`) and give eml.3/eml.5 a route pattern to extend.
-/// Real login/session-status logic is out of scope for this bead.
-pub async fn auth_status_stub() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
-}
