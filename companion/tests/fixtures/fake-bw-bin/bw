@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# Fake `bw` CLI for M1 synthetic end-to-end verification (bead
+# ai-bitwarden-hw-key-0v8.7). Mimics the subset of real `bw` behavior the
+# companion (companion/src/main.rs) actually depends on: `bw list items`
+# prints a JSON array to stdout and exits 0. No real Bitwarden account
+# involved. Shape derived from companion/src/lib.rs's parser + the M1
+# companion ADR (organizationId/folderId/favorite/collectionIds/etc are
+# real-bw fields the companion ignores, included here for realism).
+
+if [[ "$1" == "list" && "$2" == "items" ]]; then
+  cat <<'JSON'
+[
+  {
+    "object": "item",
+    "id": "11111111-1111-4111-8111-111111111111",
+    "organizationId": null,
+    "folderId": null,
+    "type": 1,
+    "reprompt": 0,
+    "name": "GitHub",
+    "notes": "Personal account, 2FA via authenticator app",
+    "favorite": true,
+    "login": {
+      "uris": [
+        { "match": null, "uri": "https://github.com/login" },
+        { "match": null, "uri": "https://github.com/settings/security" }
+      ],
+      "username": "octocat@example.com",
+      "password": "correct-horse-battery-staple",
+      "totp": "otpauth://totp/GitHub:octocat?secret=ABC123",
+      "passwordRevisionDate": "2026-01-15T10:00:00.000Z"
+    },
+    "collectionIds": [],
+    "revisionDate": "2026-01-15T10:00:00.000Z",
+    "creationDate": "2025-06-01T09:00:00.000Z",
+    "deletedDate": null
+  },
+  {
+    "object": "item",
+    "id": "22222222-2222-4222-8222-222222222222",
+    "organizationId": null,
+    "folderId": null,
+    "type": 1,
+    "reprompt": 0,
+    "name": "Netflix",
+    "notes": null,
+    "favorite": false,
+    "login": {
+      "uris": [
+        { "match": null, "uri": "https://netflix.com/login" }
+      ],
+      "username": "andreas.c@example.com",
+      "password": "Str3aming!2026",
+      "totp": null,
+      "passwordRevisionDate": null
+    },
+    "collectionIds": [],
+    "revisionDate": "2026-02-03T14:22:00.000Z",
+    "creationDate": "2025-03-11T08:30:00.000Z",
+    "deletedDate": null
+  },
+  {
+    "object": "item",
+    "id": "33333333-3333-4333-8333-333333333333",
+    "organizationId": null,
+    "folderId": null,
+    "type": 1,
+    "reprompt": 0,
+    "name": "Home Router Admin",
+    "notes": null,
+    "favorite": false,
+    "login": {
+      "uris": [
+        { "match": null, "uri": "http://192.168.1.1" }
+      ],
+      "username": null,
+      "password": "admin-console-pw-9f2",
+      "totp": null,
+      "passwordRevisionDate": null
+    },
+    "collectionIds": [],
+    "revisionDate": "2024-11-20T19:05:00.000Z",
+    "creationDate": "2024-11-20T19:05:00.000Z",
+    "deletedDate": null
+  },
+  {
+    "object": "item",
+    "id": "44444444-4444-4444-8444-444444444444",
+    "organizationId": null,
+    "folderId": null,
+    "type": 1,
+    "reprompt": 0,
+    "name": "AWS Root",
+    "notes": "Break-glass account. MFA hardware key required.",
+    "favorite": true,
+    "login": {
+      "uris": [
+        { "match": null, "uri": "https://console.aws.amazon.com" }
+      ],
+      "username": "root-billing@example.com",
+      "password": "aws-root-p@ssw0rd-2026",
+      "totp": "otpauth://totp/AWS:root?secret=XYZ789",
+      "passwordRevisionDate": "2026-04-01T00:00:00.000Z"
+    },
+    "collectionIds": [],
+    "revisionDate": "2026-04-01T00:00:00.000Z",
+    "creationDate": "2023-01-05T12:00:00.000Z",
+    "deletedDate": null
+  },
+  {
+    "object": "item",
+    "id": "55555555-5555-4555-8555-555555555555",
+    "organizationId": null,
+    "folderId": null,
+    "type": 2,
+    "reprompt": 0,
+    "name": "Tax Documents 2024 Notes",
+    "notes": "Filed via accountant, receipts in the safe.",
+    "favorite": false,
+    "secureNote": { "type": 0 },
+    "collectionIds": [],
+    "revisionDate": "2025-04-14T00:00:00.000Z",
+    "creationDate": "2025-04-14T00:00:00.000Z",
+    "deletedDate": null
+  }
+]
+JSON
+  exit 0
+fi
+
+echo "fake-bw: unrecognized invocation: $*" >&2
+exit 1
