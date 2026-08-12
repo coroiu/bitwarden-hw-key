@@ -2,8 +2,18 @@
 
 **Last Updated**: 2026-08-12 (M0 emulator milestone complete; all 9 workstreams merged)
 
-## Current Status
-The project vision has been re-grounded to focus on the Lilygo T-Embed (ESP32-S3, 320x170 color ST7789, rotary encoder) as the first concrete target. **M0 (Platform Migration) emulator milestone is complete** as of 2026-08-12: all nine workstreams (W1–W9) have been merged to main, with a fully operational 320x170 color shell, keyboard-drivable in windowed mode and fully agent-drivable in headless mode via HTTP NavIntent injection. The only remaining M0 work is on-hardware validation on the physical T-Embed board, tracked in bead `ai-bitwarden-hw-key-dvm`. **Next focus: M1 (Vault browse)**, which will use the companion-app push model to sync real Bitwarden vault credentials to the device.
+## Current Status (2026-08-12)
+
+**M0 (Platform Migration) EMULATOR MILESTONE: COMPLETE**
+All nine workstreams (W1–W9) merged to main. Fully operational 320x170 color shell, keyboard-drivable in windowed mode, fully agent-drivable in headless mode via HTTP NavIntent injection. Remaining M0 work: on-hardware validation on the physical T-Embed (bead `ai-bitwarden-hw-key-dvm`, pending board arrival).
+
+**M1 (Vault Browse) DEVICE DISPLAY: COMPLETE**
+Credential list and detail views designed and implemented on color + rotary encoder. Full render/nav/input stacks merged to main and verified headless. Real vault sync delivery deferred to M1.5 (Web Companion).
+
+**M1.5 (Web Companion) ARCHITECTURE DECIDED, PHASE 0 COMPLETE**
+The companion evolved from bw-CLI bridge proof-of-concept (proven to work, bead ai-bitwarden-hw-key-eml.1) to a full interactive web companion after Andreas clarified the UX requirement. New architecture: local Rust server (axum + tokio) running the Bitwarden Rust SDK natively, serving thin vanilla-JS web UI over 127.0.0.1. Server owns device transport (pluggable DeviceTransport trait). Phase 0 (SDK spike): proven SDK links on host in isolated nested workspace (bead ai-bitwarden-hw-key-eml.1). Phase 1 (current): axum skeleton + auth boundary merged (eml.2); auth in progress (eml.3); vault-read (eml.4), transport (eml.5), UI (eml.6), testing (eml.7) queued. Accepted PoC security posture: bind 127.0.0.1, bearer token, passwords never to browser, decrypted secret server->device only, zeroize on lock.
+
+**Next: M1.5 Phase 1 implementation and M2 (Type it)**
 
 ## Completed (Prototype Era: 128x32 Mono OLED + 3-Button Navigation)
 Historical work from the initial Adafruit HUZZAH32 prototype. Treated as throwaway pending M0 green-field redesign. Salvageable components: credential data model, sync/storage layer concept.
@@ -113,6 +123,33 @@ Historical work from the initial Adafruit HUZZAH32 prototype. Treated as throwaw
 - `ai-bitwarden-hw-key-5c8`: Broaden test coverage.
 - `ai-bitwarden-hw-key-7h7`: Host-build ergonomics (workspace default target esp32s3 forces --target; fix README build commands).
 - `ai-bitwarden-hw-key-1sg`: On-device SDK via private fork (DEFERRED, conditional on portable-vault validation).
+
+---
+
+### M1.5 (Web Companion) Epic Kickoff (2026-08-12)
+
+**Bead ai-bitwarden-hw-key-eml (epic, OPEN)** — Web companion development. Phases:
+
+**Phase 0 (Complete, 2026-08-12):**
+- SDK feasibility spike: proven Bitwarden Rust SDK (bitwarden/sdk-internal@99ffb6ef) links on macOS host in isolated nested `web-companion/` workspace
+- Isolation verified: SDK dependencies (tokio, reqwest, rustls, ring, etc.) do not entangle firmware build
+- No on-device blocker; Phase 1 can proceed
+
+**Phase 1 (In Progress, 2026-08-12):**
+- eml.2 (merged): axum server skeleton + auth boundary (login form, bearer token, session management)
+- eml.3 (in progress): auth implementation (email + password + 2FA via web UI, SDK login_password)
+- eml.4 (queued): vault read (SDK sync, decrypt, metadata list)
+- eml.5 (queued): device transport (HttpDeviceTransport for emulator; BleDeviceTransport / UsbDeviceTransport deferred to Phase 2)
+- eml.6 (queued): web UI (vanilla JS or minimal framework; login form, vault list, sync button)
+- eml.7 (queued): testing (integration tests via headless emulator; verify sync end-to-end)
+
+**Phase 2 (Deferred, overlaps M2):**
+- Device firmware sync handler (BLE/USB push protocol receiver, state machine, on-device storage)
+- Swap HttpDeviceTransport to BleDeviceTransport / UsbDeviceTransport at server startup
+- Web UI and server logic unchanged
+
+**Companion-Push Validation Path:**
+The web companion unblocks M1's real-vault requirement without on-device SDK (proven NO-GO in M0 spike). The emulator can sync and store real credentials immediately. Device display (M1) is already complete; web companion provides the sync. M2 (Type it) uses the same push protocol. This linear path validates the portable-vault concept before Phase 2 hardware complexity.
 
 ---
 

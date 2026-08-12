@@ -67,11 +67,48 @@ becomes a fallback/dev aid rather than the product path.
 - Tracked in bead `ai-bitwarden-hw-key-dvm` (on-device verification when hardware arrives).
 - *Done when:* on-T-Embed hardware, the color shell runs and is drivable by the rotary encoder. M0 epic closes after this validation.
 
-### M1: Vault browse (portable vault, part 1)
-- Credential list + detail views designed for color + rotary encoder (Uma-led design).
-- Backed by companion-app push via `PushSyncSource` (real Bitwarden vault credentials).
-- Companion app (desktop/mobile/Web Vault) runs the SDK, decrypts, and pushes to device.
-- *Done when:* you can browse your real vault on the color device.
+### M1: Vault browse (portable vault, part 1) [DEVICE DISPLAY COMPLETE]
+
+**Device Display & Navigation (Complete, merged 2026-08-12):**
+- Credential list view with selection navigation (tested via headless screenshot inspection)
+- Credential detail view layout and design
+- Color + rotary encoder UI fully implemented and verified
+- All rendering, navigation, and input stacks merged to main
+
+**Real Vault Sync (Via Web Companion Milestone, see below):**
+- Device will receive real Bitwarden vault credentials via the companion-app push model
+- Backed by companion-app push via `PushSyncSource` (real Bitwarden vault credentials)
+- Companion app (web companion, desktop, mobile, or Web Vault) runs the SDK, decrypts, and pushes to device
+- *Done when (device portion):* color display + detail views merged to main and verified headless (DONE)
+- *Done when (full M1):* you can browse your real vault on the color device (pending web-companion sync)
+
+### M1.5: Web Companion (sync credentials to device)
+
+**Purpose:** Deliver real, decrypted Bitwarden vault credentials to the device for M1 display and M2 output.
+
+**Architecture:** Local Rust server (axum + tokio) running the Bitwarden Rust SDK natively, serving a thin vanilla-JavaScript web UI over 127.0.0.1. Browser is UI only; server owns all device transport and secret handling.
+
+**Phase 1 (Current, no hardware required):**
+- Interactive web UI: login, view vault metadata, select items, sync to device
+- Device transport: HTTP POST to emulator `/api/sync` (reuses existing push-protocol wire types)
+- Real Bitwarden vault credentials synced and stored on emulator (headless or windowed)
+- Emulator can be tested by agents without hardware
+
+**Phase 2 (Overlaps M2, requires boards):**
+- Device transport: native BLE or USB serial to real T-Embed
+- Firmware gains a sync handler (new state machine for BLE/USB push protocol)
+- Web UI and server logic unchanged
+
+**Security Posture (Accepted PoC):**
+- Bind server to 127.0.0.1 only
+- Per-request bearer token validation
+- Master password never persisted; decrypted vault never sent to browser
+- Decrypted secret flows server -> device during sync; plaintext on-device (M4 hardening territory)
+- Zeroize on lock/logout
+
+**Done when:** Phase 1 complete (web UI + SDK integration + emulator sync verified), Phase 2 device transport in place and tested on T-Embed with M2 work.
+
+**Decision**: [2026-08-12-web-companion-local-server.md](./decisions/2026-08-12-web-companion-local-server.md)
 
 ### M2: Type it (portable vault payoff)
 - Credential output over **USB HID and/or BLE HID** (USB the likely primary demo path:
