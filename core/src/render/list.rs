@@ -57,13 +57,13 @@ impl ListItem {
 /// fixed for (see `ROW_HEIGHT`'s doc comment) — computed from the font's
 /// own metrics here instead of re-deriving/hardcoding it at each call
 /// site.
-const FONT_ASCENT: u32 = FONT_6X10.baseline;
-const FONT_DESCENT: u32 = FONT_6X10.character_size.height - FONT_6X10.baseline;
+pub(crate) const FONT_ASCENT: u32 = FONT_6X10.baseline;
+pub(crate) const FONT_DESCENT: u32 = FONT_6X10.character_size.height - FONT_6X10.baseline;
 
 /// Vertical padding above the label and below the sublabel, and the gap
 /// between the two lines.
-const ROW_PADDING: u32 = 1;
-const LINE_GAP: u32 = 1;
+pub(crate) const ROW_PADDING: u32 = 1;
+pub(crate) const LINE_GAP: u32 = 1;
 
 /// Pixel height of a single row (padding + label line + gap + sublabel
 /// line + padding). Fixed, like the chrome bar heights in `chrome.rs` — a
@@ -81,14 +81,35 @@ pub const ROW_HEIGHT: u32 =
     ROW_PADDING + FONT_ASCENT + FONT_DESCENT + LINE_GAP + FONT_ASCENT + FONT_DESCENT + ROW_PADDING;
 
 /// Baseline y-offset (from a row's top edge) for the label line.
-fn label_baseline_offset() -> i32 {
+///
+/// `pub(crate)`: shared with `credential_list_view.rs`, which draws its own
+/// rows (scrollbar + focus-block accent) rather than delegating to
+/// `VerticalList`, but must reuse this exact font-metrics-derived math to
+/// avoid reintroducing the row-overflow bug `ROW_HEIGHT`'s doc comment
+/// describes.
+pub(crate) fn label_baseline_offset() -> i32 {
     (ROW_PADDING + FONT_ASCENT) as i32
 }
 
 /// Baseline y-offset (from a row's top edge) for the sublabel line —
-/// directly below the label line's descent, plus `LINE_GAP`.
-fn sublabel_baseline_offset() -> i32 {
+/// directly below the label line's descent, plus `LINE_GAP`. `pub(crate)`:
+/// see `label_baseline_offset`'s doc comment.
+pub(crate) fn sublabel_baseline_offset() -> i32 {
     label_baseline_offset() + (FONT_DESCENT + LINE_GAP + FONT_ASCENT) as i32
+}
+
+/// Scroll offset (in pixels) that keeps row `selected` within
+/// `[scroll, scroll + viewport_height)`. Extracted as a free function
+/// (rather than kept solely as `VerticalList::scroll_for_viewport`'s
+/// private method body) so `credential_list_view.rs`'s hand-rolled row
+/// rendering can reuse the identical auto-scroll math instead of
+/// re-deriving it.
+pub(crate) fn scroll_offset_for_selection(selected: usize, viewport_height: u32) -> u32 {
+    if viewport_height == 0 {
+        return 0;
+    }
+    let selected_bottom = (selected as u32 + 1) * ROW_HEIGHT;
+    selected_bottom.saturating_sub(viewport_height)
 }
 
 /// Callback invoked with the selected item on activation. Named as a type
@@ -175,11 +196,7 @@ impl VerticalList {
     /// running scroll offset across frames without interior mutability;
     /// a pure recomputation avoids needing it).
     fn scroll_for_viewport(&self, viewport_height: u32) -> u32 {
-        if viewport_height == 0 {
-            return 0;
-        }
-        let selected_bottom = (self.selected as u32 + 1) * ROW_HEIGHT;
-        selected_bottom.saturating_sub(viewport_height)
+        scroll_offset_for_selection(self.selected, viewport_height)
     }
 }
 

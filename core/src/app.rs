@@ -4,7 +4,7 @@
 //! M1 replaces the M0 "empty-but-real" shortcut (rebuild the whole
 //! [`Navigator`] on every sync) with a shared, App-owned [`VaultStore`]:
 //! the [`Navigator`] is built exactly once, in [`App::new`], over a root
-//! credential list that reads the store *live* at render time.
+//! [`CredentialListView`] that reads the store *live* at render time.
 //! [`App::step`] only ever writes into the store — it never touches the
 //! `Navigator` — so a landing sync can never destroy a pushed screen (once
 //! one exists; see the ADR referenced below) or pop the user out mid-read.
@@ -13,123 +13,25 @@
 //! `.planning/decisions/2026-08-12-m1-vault-store-data-ownership.md`.
 
 use std::cell::RefCell;
-use std::convert::Infallible;
 use std::rc::Rc;
 
-use embedded_graphics::prelude::Size;
-use embedded_graphics::primitives::Rectangle;
-
+use crate::credential_list_view::CredentialListView;
 use crate::input::NavIntent;
-use crate::render::{Action, FocusEvent, FrameBuffer565, ListItem, Navigator, Screen, VerticalList, Widget};
+use crate::render::{FrameBuffer565, Navigator, Screen};
 use crate::sync_source::SyncSource;
 use crate::vault_item::VaultItem;
 use crate::vault_store::{SyncStatus, VaultStore};
 
-fn vault_item_to_list_item(item: &VaultItem) -> ListItem {
-    ListItem::new(item.name.clone()).with_sublabel(item.username.clone())
-}
-
-/// The root credential list screen's sole content widget: a thin adapter
-/// over a shared [`VaultStore`] rather than an owner of a static
-/// `Vec<ListItem>`. `render` re-derives its rows from `store.items()` on
-/// every call, so a [`VaultStore`] mutation made by [`App::step`] between
-/// two renders shows up on the very next one — no `Navigator` rebuild
-/// needed.
+/// Builds the root screen: a titled, focusable [`CredentialListView`]
+/// backed live by `store`.
 ///
-/// Deliberately minimal — this is the "keep the tree green" list, not the
-/// product one:
-/// - Selection is tracked by index (`selected`), not by `VaultItem` id.
-/// - There is no `on_activate` push to a detail screen.
-/// - There is no dedicated empty/syncing/error content rendering (an empty
-///   store just renders zero rows under the title/hint chrome).
-///
-/// All of the above are explicitly bead `ai-bitwarden-hw-key-0v8.4`'s job
-/// (`CredentialListView`, per the ADR), which supersedes this type
-/// entirely. It exists only so the root list keeps rendering and
-/// live-updating while that lands.
-struct StoreBackedCredentialList {
-    store: Rc<RefCell<VaultStore>>,
-    selected: usize,
-    focused: bool,
-}
-
-impl StoreBackedCredentialList {
-    fn new(store: Rc<RefCell<VaultStore>>) -> Self {
-        Self { store, selected: 0, focused: false }
-    }
-
-    fn item_count(&self) -> usize {
-        self.store.borrow().items().len()
-    }
-
-    // Mirrors `render::list::VerticalList::move_selection` exactly (same
-    // `usize`<->`i32` index arithmetic, same module-level allow rationale
-    // in `render/mod.rs`: a vault has, realistically, a few hundred items
-    // at most on this embedded/emulator target — nowhere near `i32::MAX` —
-    // so these conversions cannot truncate, wrap, or lose a sign in
-    // practice.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap, clippy::cast_sign_loss)]
-    fn move_selection(&mut self, delta: i32) {
-        let len = self.item_count() as i32;
-        if len == 0 {
-            return;
-        }
-        let next = (self.selected as i32 + delta).clamp(0, len - 1);
-        self.selected = next as usize;
-    }
-}
-
-impl Widget for StoreBackedCredentialList {
-    fn measure(&self, constraints: Size) -> Size {
-        constraints
-    }
-
-    fn is_focusable(&self) -> bool {
-        self.item_count() > 0
-    }
-
-    fn on_focus(&mut self, event: FocusEvent) -> Action {
-        match event {
-            FocusEvent::Gained => self.focused = true,
-            FocusEvent::Lost => self.focused = false,
-            FocusEvent::Activated => {}
-        }
-        Action::None
-    }
-
-    fn on_intent(&mut self, intent: NavIntent) -> Action {
-        match intent {
-            NavIntent::Next => self.move_selection(1),
-            NavIntent::Prev => self.move_selection(-1),
-            NavIntent::NextN(n) => self.move_selection(i32::from(n)),
-            NavIntent::Activate | NavIntent::Back => {}
-        }
-        Action::None
-    }
-
-    fn render(&self, area: Rectangle, target: &mut FrameBuffer565) -> Result<(), Infallible> {
-        // Live read: today's store contents, not whatever was current when
-        // this widget (or the `Navigator` it lives in) was constructed.
-        let list_items: Vec<ListItem> =
-            self.store.borrow().items().iter().map(vault_item_to_list_item).collect();
-
-        // `VerticalList` owns the actual row-drawing/scroll/highlight
-        // logic; rebuilding one transiently on every render (rather than
-        // duplicating that logic here) is cheap and keeps this adapter
-        // genuinely thin. `selected`/`focused` are *this* widget's
-        // persistent state (survives across renders); `with_selected`/
-        // `with_focused` carry them into the transient `VerticalList`.
-        VerticalList::new(list_items)
-            .with_selected(self.selected)
-            .with_focused(self.focused)
-            .render(area, target)
-    }
-}
-
-/// Builds the root screen: a titled, focusable vertical list backed live by
-/// `store`.
+/// No `.on_activate(...)` is registered here — there is no detail screen
+/// to push yet (that's bead `ai-bitwarden-hw-key-0v8.6`'s job). Activating
+/// the list is a documented no-op until then; see
+/// [`CredentialListView::on_activate`]'s doc comment for the seam
+/// `0v8.6` will wire up.
 fn credential_list_screen(store: Rc<RefCell<VaultStore>>) -> Screen {
-    let list = StoreBackedCredentialList::new(store);
+    let list = CredentialListView::new(store);
     Screen::new("Vault", vec![Box::new(list)]).with_hint("Next/Prev  Select  Back")
 }
 
@@ -244,6 +146,8 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::convert::Infallible;
+
     use embedded_graphics::pixelcolor::{Rgb565, WebColors};
     use embedded_graphics::prelude::Point;
     use uuid::Uuid;
@@ -298,13 +202,16 @@ mod tests {
         // -> render), not directly against `Navigator`.
         let mut app = App::new(320, 170, vec![item("GitHub"), item("AWS"), item("Postgres")]);
 
-        let frame_0 = app.render().pixel(Point::new(2, 18));
+        // x=250: past the 3px focus-accent bar at x in [0,3) *and* past
+        // any of these short labels' text, so it samples the row's plain
+        // fill rather than the accent stripe or a glyph pixel.
+        let frame_0 = app.render().pixel(Point::new(250, 18));
         assert_eq!(frame_0, Rgb565::CSS_DARK_SLATE_BLUE, "row 0 should start selected");
 
         app.handle_input(vec![NavIntent::Next]);
         assert!(app.dirty(), "moving selection should mark the app dirty");
 
-        let frame_1_row_0 = app.render().pixel(Point::new(2, 18));
+        let frame_1_row_0 = app.render().pixel(Point::new(250, 18));
         assert_ne!(frame_1_row_0, Rgb565::CSS_DARK_SLATE_BLUE, "row 0 should no longer be selected");
     }
 

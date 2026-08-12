@@ -148,8 +148,17 @@ fn injecting_a_navintent_over_http_moves_the_selection_and_is_observable_in_the_
     // `navigator.rs`'s own
     // `rendering_into_the_same_framebuffer_twice_does_not_leave_the_previous_frames_selection_highlight_behind`
     // test uses for the identical row-0 case.
+    //
+    // x=250 (not x=2): `CredentialListView` (bead `ai-bitwarden-hw-key-0v8.4`)
+    // paints a 3px focus-accent bar at the left edge of a selected row
+    // (x in [0,3)) in a different color than the row's plain fill, and
+    // draws row text starting at x=4 -- either of which x=2/x=6 could land
+    // on depending on the label. x=250 is comfortably past both of these
+    // short labels' text and well clear of the accent bar, landing on the
+    // plain fill/background every time.
     let row0_y = TITLE_BAR_HEIGHT + 2;
     let row1_y = TITLE_BAR_HEIGHT + ROW_HEIGHT + 2;
+    let sample_x = 250;
     let highlight = Rgb565::CSS_DARK_SLATE_BLUE;
     let highlight_rgb8 = image::Rgb([highlight.r() << 3, highlight.g() << 2, highlight.b() << 3]);
 
@@ -162,8 +171,8 @@ fn injecting_a_navintent_over_http_moves_the_selection_and_is_observable_in_the_
     });
 
     let before = decode_screenshot(get(addr, "/api/screenshot"));
-    assert_eq!(*before.get_pixel(2, row0_y), highlight_rgb8, "row 0 starts selected");
-    assert_ne!(*before.get_pixel(2, row1_y), highlight_rgb8, "row 1 is not selected before any input");
+    assert_eq!(*before.get_pixel(sample_x, row0_y), highlight_rgb8, "row 0 starts selected");
+    assert_ne!(*before.get_pixel(sample_x, row1_y), highlight_rgb8, "row 1 is not selected before any input");
 
     // --- Inject NavIntent::Next over HTTP -- the exact wire shape
     // `bhk_core::input::NavIntent`'s derived `Deserialize` expects for a
@@ -183,12 +192,12 @@ fn injecting_a_navintent_over_http_moves_the_selection_and_is_observable_in_the_
 
     let after = decode_screenshot(get(addr, "/api/screenshot"));
     assert_ne!(
-        *after.get_pixel(2, row0_y),
+        *after.get_pixel(sample_x, row0_y),
         highlight_rgb8,
         "row 0's highlight must not still be showing after the injected Next moved the selection away"
     );
     assert_eq!(
-        *after.get_pixel(2, row1_y),
+        *after.get_pixel(sample_x, row1_y),
         highlight_rgb8,
         "row 1 must become selected once the HTTP-injected Next reaches the running App"
     );

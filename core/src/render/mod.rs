@@ -51,4 +51,4 @@ pub use framebuffer::FrameBuffer565;
 pub use list::{ListItem, VerticalList, ROW_HEIGHT};
 pub use navigator::Navigator;
 pub use screen::Screen;
-pub use widget::{Action, FocusEvent, Widget};
+pub use widget::{draw_focus_block, Action, FocusEvent, Widget, FOCUS_ACCENT_WIDTH};
