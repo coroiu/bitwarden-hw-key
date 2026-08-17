@@ -19,17 +19,20 @@
 //! encoder acceleration timing as a platform/input-driver concern, not
 //! something the app core should see).
 //!
-//! **Completely untested.** There is no T-Embed on this machine, so
-//! nothing here has been exercised against a real encoder: not the
-//! quadrature decoding, not the acceleration thresholds (chosen to match
-//! the ADR's literal wording, not tuned against real spin speeds), and
-//! not the pull-up assumption below.
+//! **Not yet exercised against a real encoder.** The GPIO pins below were
+//! corrected to the T-Embed CC1101's actual encoder wiring (bead
+//! ai-bitwarden-hw-key-ekd; see `board_config`'s `ENCODER_PIN_A`/`B` for
+//! sourcing) alongside the display fix in bead ai-bitwarden-hw-key-c6e,
+//! but as of that change nothing here has been exercised against the
+//! real encoder yet: not the quadrature decoding, not the acceleration
+//! thresholds (chosen to match the ADR's literal wording, not tuned
+//! against real spin speeds), and not the pull-up assumption below.
 
 use std::time::{Duration, Instant};
 
 use bhk_core::{platform::InputSource, NavIntent};
 use button_driver::{Button, ButtonConfig};
-use esp_idf_hal::gpio::{Gpio0, Gpio1, Gpio2, Input, PinDriver, Pull};
+use esp_idf_hal::gpio::{Gpio0, Gpio4, Gpio5, Input, PinDriver, Pull};
 use esp_idf_hal::sys::EspError;
 use rotary_encoder_hal::{DefaultPhase, Direction, Rotary};
 
@@ -103,8 +106,15 @@ impl AccelerationWindow {
 /// pre-configured `PinDriver`s) because the pull-up requirement below is
 /// encoder wiring knowledge, not board-specific pin-map knowledge — it
 /// belongs with the driver, not `board_config`.
+///
+/// The T-Embed CC1101 also has an independent user button on GPIO6
+/// (`BOARD_USER_KEY`, separate from the encoder's own press), a
+/// candidate for a dedicated `Back` in the future. It is intentionally
+/// **not** wired up here — out of scope for this pass, tracked in bead
+/// ai-bitwarden-hw-key-ekd alongside the rest of the multi-variant board
+/// selection.
 pub struct RotaryEncoderInput {
-    rotary: Rotary<PinDriver<'static, Gpio2, Input>, PinDriver<'static, Gpio1, Input>, DefaultPhase>,
+    rotary: Rotary<PinDriver<'static, Gpio4, Input>, PinDriver<'static, Gpio5, Input>, DefaultPhase>,
     button: Button<PinDriver<'static, Gpio0, Input>, Instant>,
     fast_window: Option<AccelerationWindow>,
 }
@@ -124,7 +134,7 @@ impl RotaryEncoderInput {
     /// inspected on hardware to confirm it doesn't already provide its
     /// own pull-ups (which would make this redundant but harmless) or,
     /// worse, pull-downs (which would make this wrong).
-    pub fn new(pin_a: Gpio2, pin_b: Gpio1, button_pin: Gpio0) -> Result<Self, EspError> {
+    pub fn new(pin_a: Gpio4, pin_b: Gpio5, button_pin: Gpio0) -> Result<Self, EspError> {
         let mut a = PinDriver::input(pin_a)?;
         a.set_pull(Pull::Up)?;
         let mut b = PinDriver::input(pin_b)?;

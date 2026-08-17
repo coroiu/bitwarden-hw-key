@@ -33,15 +33,15 @@
 //! T-Embed CC1101 is right-side up, fills the panel with no
 //! offset/cropping, and shows correct colors.
 //!
-//! **The rotary encoder pins (`ENCODER_PIN_A`/`B`) are ALSO wrong for
+//! **The rotary encoder pins (`ENCODER_PIN_A`/`B`) were ALSO wrong for
 //! this board** (CC1101 uses GPIO4/GPIO5, not GPIO2/GPIO1 — see
-//! `.research/findings/2026-08-12-t-embed-input-hardware.md`), but are
-//! left uncorrected here deliberately: this pass is scoped to the
-//! display bring-up only (getting the panel lit), and the clean
-//! build-time plain-vs-CC1101 board selection (which would fix the
-//! encoder pins properly, with both variants supported) is tracked
-//! separately in bead ai-bitwarden-hw-key-ekd. Don't assume the encoder
-//! works on this hardware yet.
+//! `.research/findings/2026-08-12-t-embed-input-hardware.md`) and have
+//! now been corrected below, per bead ai-bitwarden-hw-key-ekd. The clean
+//! build-time plain-vs-CC1101 board selection (supporting both variants
+//! at once, rather than this hardcoded CC1101-only pin map) is still
+//! tracked separately in that bead. As of this correction the encoder
+//! pins are believed right but not yet hardware-exercised — see
+//! `rotary_input`'s module doc.
 //!
 //! # Source of the pin map
 //!
@@ -67,22 +67,27 @@
 //!   `st7789_surface.rs`, verified by direct human observation on the
 //!   real T-Embed CC1101 panel.
 //! - The rotary encoder's electrical behavior (pull-up requirements,
-//!   debounce characteristics) is untested, and (per above) its pins are
-//!   currently wrong for this board anyway.
+//!   debounce characteristics) is untested. Its pins have now been
+//!   corrected to the CC1101's actual wiring (bead ekd) but the encoder
+//!   itself has not yet been hardware-exercised.
 
-use esp_idf_hal::gpio::{AnyOutputPin, Gpio0, Gpio1, Gpio2};
+use esp_idf_hal::gpio::{AnyOutputPin, Gpio0, Gpio4, Gpio5};
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_hal::spi::SPI2;
 
 /// The T-Embed's rotary encoder quadrature pins.
 ///
-/// **WRONG FOR THIS BOARD (T-Embed CC1101)** — left uncorrected
-/// deliberately; see this module's header doc. Plain-T-Embed source:
-/// `pin_config.h` `PIN_ENCODE_A` / `PIN_ENCODE_B`. The CC1101's actual
-/// `ENCODER_INA`/`ENCODER_INB` are GPIO4/GPIO5 (bead ai-bitwarden-hw-key-ekd).
-/// Untested: pull configuration and debounce (see `rotary_input`).
-pub const ENCODER_PIN_A: u8 = 2;
-pub const ENCODER_PIN_B: u8 = 1;
+/// Source (T-Embed CC1101): `examples/utilities.h` `ENCODER_INA`/
+/// `ENCODER_INB` = GPIO4/GPIO5 (bead ai-bitwarden-hw-key-ekd; also
+/// confirmed against `.research/findings/2026-08-12-t-embed-input-hardware.md`).
+/// (Plain T-Embed's `pin_config.h` has `PIN_ENCODE_A`/`B` = GPIO2/GPIO1 —
+/// different pins; that was the pre-correction, wrong value here.) The
+/// CC1101 also has an independent user button on GPIO6
+/// (`BOARD_USER_KEY`), intentionally left unwired — see `rotary_input`'s
+/// module doc. Untested: pull configuration and debounce (see
+/// `rotary_input`).
+pub const ENCODER_PIN_A: u8 = 4;
+pub const ENCODER_PIN_B: u8 = 5;
 
 /// The T-Embed's rotary encoder push-button pin.
 ///
@@ -165,8 +170,8 @@ pub struct BoardPeripherals {
     // (`TFT_RST = -1`); see `LCD_CS_PIN`'s doc comment.
     pub lcd_backlight: AnyOutputPin,
     pub peripheral_power_on: AnyOutputPin,
-    pub encoder_pin_a: Gpio2,
-    pub encoder_pin_b: Gpio1,
+    pub encoder_pin_a: Gpio4,
+    pub encoder_pin_b: Gpio5,
     pub encoder_button: Gpio0,
 }
 
@@ -190,8 +195,8 @@ impl BoardPeripherals {
             lcd_dc: p.pins.gpio16.into(),
             lcd_backlight: p.pins.gpio21.into(),
             peripheral_power_on: p.pins.gpio15.into(),
-            encoder_pin_a: p.pins.gpio2,
-            encoder_pin_b: p.pins.gpio1,
+            encoder_pin_a: p.pins.gpio4,
+            encoder_pin_b: p.pins.gpio5,
             encoder_button: p.pins.gpio0,
         })
     }
@@ -206,7 +211,7 @@ const _: () = {
     assert!(LCD_DC_PIN == 16);
     assert!(LCD_BACKLIGHT_PIN == 21);
     assert!(PERIPHERAL_POWER_ON_PIN == 15);
-    assert!(ENCODER_PIN_A == 2);
-    assert!(ENCODER_PIN_B == 1);
+    assert!(ENCODER_PIN_A == 4);
+    assert!(ENCODER_PIN_B == 5);
     assert!(ENCODER_BUTTON_PIN == 0);
 };
