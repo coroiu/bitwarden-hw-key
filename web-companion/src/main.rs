@@ -42,7 +42,19 @@ async fn main() {
         .await
         .expect("failed to bind 127.0.0.1:3000");
 
+    // Guaranteed-visible startup banner: println! (not tracing/log) so it
+    // shows even with no subscriber configured. Without this the server was
+    // silent after cargo run's "Running ..." line and looked dead even
+    // though it was up and serving (ai-bitwarden-hw-key-eml.10).
+    let addr = listener
+        .local_addr()
+        .expect("bound listener has a local address");
+    println!("Web companion listening on http://{addr}");
+    println!("Open that URL in your browser to log in and sync.");
+
     axum::serve(listener, app)
         .await
         .expect("web-companion server exited unexpectedly");
+
+    println!("Web companion server shut down.");
 }
