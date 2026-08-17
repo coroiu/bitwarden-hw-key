@@ -8,6 +8,7 @@
 //! domain model. Call sites (e.g. a future `CredentialListView`) map
 //! `VaultItem -> ListItem`.
 
+use std::cell::Cell;
 use std::convert::Infallible;
 
 use embedded_graphics::{
@@ -155,18 +156,76 @@ pub(crate) const fn username_top_offset() -> i32 {
     name_top_offset() + NAME_LINE_FOOTPRINT + LINE_GAP
 }
 
-/// Scroll offset (in pixels) that keeps row `selected` within
-/// `[scroll, scroll + viewport_height)`. Extracted as a free function
-/// (rather than kept solely as `VerticalList::scroll_for_viewport`'s
-/// private method body) so `credential_list_view.rs`'s hand-rolled row
-/// rendering can reuse the identical auto-scroll math instead of
-/// re-deriving it.
-pub(crate) fn scroll_offset_for_selection(selected: usize, viewport_height: u32) -> u32 {
-    if viewport_height == 0 {
+/// Reconciles a list's scroll-top **row index** against a newly resolved
+/// selection — the "only scroll at the viewport edges" rule (bead
+/// `ai-bitwarden-hw-key-47g`), replacing the retired
+/// `scroll_offset_for_selection`/`VerticalList::scroll_for_viewport`
+/// (see their old doc comments' git history for why this file used to
+/// pin the selected row to the viewport's bottom edge on every render —
+/// a `selected`-only pure function had no way to know the list *hadn't*
+/// scrolled off past that row, only where it currently is).
+///
+/// Index-based (rows, not pixels) so it's resolution-independent — the
+/// caller multiplies by whatever its row height is (`ROW_HEIGHT` here,
+/// a pixel-range variant for `credential_detail_view.rs`'s per-field
+/// bead `ai-bitwarden-hw-key-8kx`).
+///
+/// # Why this runs at render time, not in `on_intent`
+///
+/// `on_intent` only knows the selection *delta* (`NavIntent::Next`/
+/// `Prev`/`NextN`) — it has no idea how many rows the viewport can
+/// currently show (`area.size.height` is a render-time input, passed to
+/// `Widget::render`, never to `Widget::on_intent`). This function is
+/// therefore called from `render`, fed whatever `top_index` was
+/// persisted from the *previous* render — **not** a design smell to
+/// "fix" by threading `visible_rows` through `on_intent` instead: the
+/// rule below is an idempotent clamp (calling it twice in a row with
+/// the same inputs returns the same `top`), so re-running it every
+/// render is exactly as correct as running it once per intent would be,
+/// just simpler (one call site, no risk of `on_intent` and `render`
+/// disagreeing about `visible_rows` if the viewport is ever resized).
+/// **Do not** move this into `on_intent` — that would reintroduce the
+/// "no viewport dimensions available" problem this design sidesteps.
+///
+/// # The rule
+///
+/// - No items: top is always `0`.
+/// - `prev_top` is first clamped to `max_top` (`item_count -
+///   visible_rows`, floored at `0`) — handles the list having shrunk
+///   since the last render (e.g. a deletion), so a stale `top` can't
+///   leave blank space below the last row.
+/// - If `selected` is above the current window (`selected < top`):
+///   scroll up exactly enough to make it the *first* visible row.
+/// - If `selected` is below the current window (`selected >= top +
+///   visible_rows`): scroll down exactly enough to make it the *last*
+///   visible row.
+/// - Otherwise (`selected` is already somewhere inside `[top, top +
+///   visible_rows)`): **`top` is left unchanged.** This is the actual
+///   fix — the old pin-to-bottom formula recomputed a fresh scroll
+///   position from `selected` alone on every call, so moving the
+///   selection *up* while it was still fully visible re-pinned it to
+///   the viewport's bottom edge anyway (see bead 47g's repro: move
+///   down, then back up one row — the row above was already on
+///   screen, yet the old code scrolled the list to redraw it at the
+///   bottom).
+#[must_use]
+pub(crate) fn reconcile_top_index(prev_top: usize, selected: usize, visible_rows: usize, item_count: usize) -> usize {
+    if item_count == 0 {
         return 0;
     }
-    let selected_bottom = (selected as u32 + 1) * ROW_HEIGHT;
-    selected_bottom.saturating_sub(viewport_height)
+    let visible_rows = visible_rows.max(1);
+    let max_top = item_count.saturating_sub(visible_rows);
+    let mut top = prev_top.min(max_top);
+
+    if selected < top {
+        top = selected;
+    } else if selected >= top + visible_rows {
+        top = selected - visible_rows + 1;
+    }
+    // else: selected is already visible within the current window --
+    // leave `top` unchanged. THE FIX.
+
+    top.min(max_top)
 }
 
 /// Draws one list row's shared visual language: an optional hairline
@@ -273,11 +332,19 @@ type OnActivate = Box<dyn Fn(&ListItem) -> Action>;
 
 /// A focusable, scrollable vertical list of [`ListItem`]s. Moves its
 /// internal selection in response to `NavIntent::{Next,Prev,NextN}` via
-/// `Widget::on_intent`, auto-scrolling to keep the selection visible; fires
-/// its `on_activate` callback (if any) when activated while focused.
+/// `Widget::on_intent`, auto-scrolling to keep the selection visible (only
+/// at the viewport edges — see [`reconcile_top_index`]); fires its
+/// `on_activate` callback (if any) when activated while focused.
 pub struct VerticalList {
     items: Vec<ListItem>,
     selected: usize,
+    /// The row index currently scrolled to the top of the viewport.
+    /// `Cell`, not a plain field, for the same reason
+    /// `CredentialListView`'s `selected_id`/`last_index` are: `Widget::
+    /// render` takes `&self` but still needs to persist this across
+    /// calls (see [`reconcile_top_index`]'s doc comment on why the
+    /// reconciliation runs in `render`, not `on_intent`).
+    top_index: Cell<usize>,
     focused: bool,
     on_activate: Option<OnActivate>,
 }
@@ -288,6 +355,7 @@ impl VerticalList {
         Self {
             items,
             selected: 0,
+            top_index: Cell::new(0),
             focused: false,
             on_activate: None,
         }
@@ -340,18 +408,6 @@ impl VerticalList {
         let len = self.items.len() as i32;
         let next = (self.selected as i32 + delta).clamp(0, len - 1);
         self.selected = next as usize;
-    }
-
-    /// Scroll offset (in pixels) that keeps the selected row within
-    /// `[scroll, scroll + viewport_height)`, per the salvaged
-    /// `VerticalMenu::auto_scroll` concept — reimplemented as a pure
-    /// function of `selected` and the viewport height on offer at render
-    /// time, rather than mutable state threaded through `on_intent`
-    /// (`Widget::render` takes `&self`, so there's nowhere to persist a
-    /// running scroll offset across frames without interior mutability;
-    /// a pure recomputation avoids needing it).
-    fn scroll_for_viewport(&self, viewport_height: u32) -> u32 {
-        scroll_offset_for_selection(self.selected, viewport_height)
     }
 }
 
@@ -407,7 +463,14 @@ impl Widget for VerticalList {
         // widget.
         let mut clipped = target.clipped(&area);
 
-        let scroll = self.scroll_for_viewport(area.size.height);
+        // "Only scroll at the viewport edges" (bead 47g) -- see
+        // `reconcile_top_index`'s doc comment for the full rule and why
+        // this reconciliation happens here, in `render`, rather than in
+        // `on_intent`.
+        let visible_rows = (area.size.height / ROW_HEIGHT).max(1) as usize;
+        let top = reconcile_top_index(self.top_index.get(), self.selected, visible_rows, self.items.len());
+        self.top_index.set(top);
+        let scroll = top as u32 * ROW_HEIGHT;
 
         for (index, item) in self.items.iter().enumerate() {
             let row_top =
@@ -527,26 +590,154 @@ mod tests {
 
     #[test]
     fn scroll_for_viewport_keeps_the_selection_visible() {
+        // Updated to bead 47g's "only scroll at the viewport edges" rule:
+        // `VerticalList` now persists `top_index` across `render` calls
+        // instead of recomputing a fresh scroll position from `selected`
+        // alone every time (the retired `scroll_offset_for_selection`'s
+        // pin-to-bottom behavior).
         let mut list = VerticalList::new(items(10));
-        let viewport_height = 3 * ROW_HEIGHT; // fits 3 rows
+        let visible_rows = 3;
+        let viewport_height = visible_rows as u32 * ROW_HEIGHT; // fits 3 rows
+        let area = Rectangle::new(Point::new(0, 0), Size::new(320, viewport_height));
+        let mut fb = FrameBuffer565::new(320, viewport_height);
 
         // Selection within the first screenful: no scroll needed.
-        assert_eq!(list.scroll_for_viewport(viewport_height), 0);
+        list.render(area, &mut fb).unwrap();
+        assert_eq!(list.top_index.get(), 0);
 
         // Selecting row 4 (0-indexed) means rows 0-3 no longer all fit;
-        // scroll should reveal it as the bottom-most visible row.
+        // top should advance just enough to make row 4 the last visible
+        // row (top=2: rows 2,3,4 visible), not "selected's own bottom
+        // pinned to the viewport bottom" (the old, buggy rule).
         for _ in 0..4 {
             list.on_intent(NavIntent::Next);
         }
-        let scroll = list.scroll_for_viewport(viewport_height);
-        assert_eq!(scroll, (5 * ROW_HEIGHT) - viewport_height);
+        list.render(area, &mut fb).unwrap();
+        assert_eq!(list.top_index.get(), 2);
 
         // The selected row's own top and bottom must both land inside
-        // [scroll, scroll + viewport_height).
+        // the visible window.
+        let scroll = list.top_index.get() as u32 * ROW_HEIGHT;
         let selected_top = 4 * ROW_HEIGHT;
         let selected_bottom = selected_top + ROW_HEIGHT;
         assert!(selected_top >= scroll);
         assert!(selected_bottom <= scroll + viewport_height);
+    }
+
+    #[test]
+    fn moving_up_while_still_visible_does_not_re_pin_to_the_viewport_edge() {
+        // The bead 47g repro, exercised through the actual widget (not
+        // just `reconcile_top_index` directly, below): move down enough
+        // to scroll, then back up ONE row that was already visible --
+        // the list must not scroll again.
+        let mut list = VerticalList::new(items(10));
+        let visible_rows = 3;
+        let viewport_height = visible_rows as u32 * ROW_HEIGHT;
+        let area = Rectangle::new(Point::new(0, 0), Size::new(320, viewport_height));
+        let mut fb = FrameBuffer565::new(320, viewport_height);
+
+        for _ in 0..4 {
+            list.on_intent(NavIntent::Next);
+        }
+        list.render(area, &mut fb).unwrap(); // selected=4, top settles at 2
+        let top_after_scrolling_down = list.top_index.get();
+        assert_eq!(top_after_scrolling_down, 2);
+
+        list.on_intent(NavIntent::Prev); // selected=3, still within [2, 5)
+        list.render(area, &mut fb).unwrap();
+        assert_eq!(
+            list.top_index.get(),
+            top_after_scrolling_down,
+            "moving up into an already-visible row must not scroll the list"
+        );
+    }
+
+    mod reconcile_top_index_tests {
+        use super::super::reconcile_top_index;
+
+        // Fern's traces (bead 47g design), each checked independently
+        // against the pure function rather than through the widget, so
+        // the exact rule is pinned down unambiguously.
+
+        #[test]
+        fn a_big_jump_scrolls_down_just_enough_to_reveal_the_new_selection() {
+            // NextN(20) from top=0, visible_rows=3, 10 items clamps
+            // selection to the last item (9), and top should land at 7
+            // (rows 7,8,9 visible -- 9 is the new last visible row).
+            assert_eq!(reconcile_top_index(0, 9, 3, 10), 7);
+        }
+
+        #[test]
+        fn moving_above_the_window_scrolls_up_to_make_it_the_first_row() {
+            // Continuing from top=7: selecting row 6 (above the current
+            // [7, 10) window) scrolls up so it becomes the top row.
+            assert_eq!(reconcile_top_index(7, 6, 3, 10), 6);
+        }
+
+        #[test]
+        fn moving_within_the_current_window_leaves_top_unchanged() {
+            // THE FIX: with top=6 (window [6, 9)), selecting 6, 7, or 8
+            // must never change top -- this is exactly what the old
+            // pin-to-bottom formula got wrong (it would re-pin on every
+            // move regardless of whether the row was already visible).
+            assert_eq!(reconcile_top_index(6, 6, 3, 10), 6);
+            assert_eq!(reconcile_top_index(6, 7, 3, 10), 6);
+            assert_eq!(reconcile_top_index(6, 8, 3, 10), 6);
+        }
+
+        #[test]
+        fn a_shrinking_list_clamps_top_so_there_is_no_blank_space_below_the_last_row() {
+            // The list shrank to 4 items (visible_rows still 3) while top
+            // was still 6 from a longer list -- max_top is now 4-3=1, so
+            // top must clamp down to 1, not leave rows 6.. rendering
+            // nothing while the viewport has unused space.
+            assert_eq!(reconcile_top_index(6, 3, 3, 4), 1);
+        }
+
+        #[test]
+        fn zero_items_always_reports_top_zero() {
+            assert_eq!(reconcile_top_index(5, 0, 3, 0), 0);
+        }
+
+        #[test]
+        fn visible_rows_of_zero_is_treated_as_one_not_a_division_by_zero() {
+            // `visible_rows.max(1)` in the implementation -- a
+            // zero-height viewport must not panic or produce a
+            // nonsensical max_top.
+            assert_eq!(reconcile_top_index(0, 0, 0, 5), 0);
+        }
+
+        #[test]
+        fn regression_47g_moving_below_the_window_then_back_up_one_row_leaves_top_unchanged() {
+            // The exact bug bead 47g reported, reproduced against the
+            // pure function directly (the widget-level equivalent is
+            // `moving_up_while_still_visible_does_not_re_pin_to_the_
+            // viewport_edge` above): the selection moves down far enough
+            // that the window has to scroll (top advances from 0 to 2 as
+            // selected goes 0->4, one `Next` at a time, mirroring what
+            // `VerticalList::render` actually does on every frame), then
+            // Prev moves the selection back up ONE row that is still
+            // inside that window -- top must stay exactly where it was,
+            // not recompute a fresh position from the new `selected`
+            // alone (the retired `scroll_offset_for_selection`'s bug:
+            // it would have put top back at 1, not 2, because it never
+            // looked at where the window currently was).
+            let visible_rows = 3;
+            let item_count = 10;
+
+            let mut top = 0;
+            for selected in 0..=4 {
+                top = reconcile_top_index(top, selected, visible_rows, item_count);
+            }
+            assert_eq!(top, 2, "sanity check: the window should have scrolled to keep row 4 visible");
+
+            let top_before_prev = top;
+            let top_after_prev = reconcile_top_index(top, 3, visible_rows, item_count);
+            assert_eq!(
+                top_after_prev, top_before_prev,
+                "moving back into an already-visible row must not scroll the list"
+            );
+        }
     }
 
     #[test]

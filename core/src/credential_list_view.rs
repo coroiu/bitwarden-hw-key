@@ -68,7 +68,7 @@ use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
 use uuid::Uuid;
 
 use crate::input::NavIntent;
-use crate::render::list::{draw_row, name_top_offset, scroll_offset_for_selection, username_top_offset};
+use crate::render::list::{draw_row, name_top_offset, reconcile_top_index, username_top_offset};
 use crate::render::theme::{font, icon, palette};
 use crate::render::{Action, ChromeContribution, ChromeStatus, FocusEvent, FrameBuffer565, Widget, ROW_HEIGHT};
 use crate::vault_item::VaultItem;
@@ -157,6 +157,14 @@ pub struct CredentialListView {
     /// widget clamps to the item now nearest that position rather than
     /// jumping back to the top.
     last_index: Cell<usize>,
+    /// The row index currently scrolled to the top of the list viewport
+    /// — the persistent scroll state bead `ai-bitwarden-hw-key-47g` adds
+    /// so auto-scroll only happens at the viewport edges, not on every
+    /// selection move. `Cell` for the same reason `selected_id`/
+    /// `last_index` are: reconciled inside `render_list` (`&self`) via
+    /// [`reconcile_top_index`] — see that function's doc comment for why
+    /// this reconciliation belongs in `render`, not `on_intent`.
+    top_index: Cell<usize>,
     focused: bool,
     on_activate: Option<OnActivate>,
 }
@@ -168,6 +176,7 @@ impl CredentialListView {
             store,
             selected_id: Cell::new(None),
             last_index: Cell::new(0),
+            top_index: Cell::new(0),
             focused: false,
             on_activate: None,
         }
@@ -265,7 +274,14 @@ impl CredentialListView {
         let rows_width = area.size.width.saturating_sub(SCROLLBAR_WIDTH);
         let rows_area = Rectangle::new(area.top_left, Size::new(rows_width, area.size.height));
 
-        let scroll = selected.map_or(0, |index| scroll_offset_for_selection(index, area.size.height));
+        // "Only scroll at the viewport edges" (bead 47g) -- see
+        // `reconcile_top_index`'s doc comment for the full rule and why
+        // this reconciliation happens here, in `render`, rather than in
+        // `on_intent` (which has no viewport dimensions to work with).
+        let visible_rows = (area.size.height / ROW_HEIGHT) as usize;
+        let top = reconcile_top_index(self.top_index.get(), selected.unwrap_or(0), visible_rows, items.len());
+        self.top_index.set(top);
+        let scroll = top as u32 * ROW_HEIGHT;
 
         {
             let mut clipped = target.clipped(&rows_area);
@@ -800,6 +816,68 @@ mod tests {
         });
         let action = view.on_focus(FocusEvent::Activated);
         assert!(matches!(action, Action::PopView));
+    }
+
+    #[test]
+    fn moving_selection_up_within_the_visible_window_does_not_scroll_the_list() {
+        // The bead 47g repro, at the actual production widget (not just
+        // `render::list::VerticalList`, which the emulator/headless
+        // widget layer doesn't actually use): scroll down far enough
+        // that the window has moved, then move the selection back up
+        // ONE row that's already visible -- the list must not scroll
+        // again. Every row's on-screen position must stay identical;
+        // only the selection highlight should move.
+        let items: Vec<VaultItem> = (0..10).map(|i| item(&format!("item-{i}"))).collect();
+        let store = store_with(items);
+        let mut view = CredentialListView::new(store);
+        view.on_focus(FocusEvent::Gained);
+
+        for _ in 0..4 {
+            view.on_intent(NavIntent::Next);
+        }
+        assert_eq!(view.selected_index(), Some(4));
+
+        let mut fb_a = FrameBuffer565::new(320, 150);
+        view.render(AREA, &mut fb_a).unwrap();
+        let top_after_scrolling_down = view.top_index.get();
+        assert_eq!(top_after_scrolling_down, 2, "sanity check: the window should have scrolled to keep row 4 visible");
+
+        // Row 2 (the window's new top row) is not selected in either
+        // frame -- a plain chip-fill pixel here must be byte-identical
+        // between the two renders if (and only if) the row didn't move.
+        let row2_top = AREA.top_left.y + (2 - top_after_scrolling_down as i32) * ROW_HEIGHT as i32;
+        let non_selected_row_sample = Point::new(20, row2_top + 5);
+
+        // Row 4's and row 3's selection-fill pixel (same x=250 sampling
+        // convention as this file's other selection-highlight tests,
+        // e.g. `focus_survives_the_empty_to_populated_transition`):
+        // past the accent bar and these short labels' text.
+        let row4_top = AREA.top_left.y + (4 - top_after_scrolling_down as i32) * ROW_HEIGHT as i32;
+        let row3_top = AREA.top_left.y + (3 - top_after_scrolling_down as i32) * ROW_HEIGHT as i32;
+        let row4_fill_sample = Point::new(250, row4_top + 2);
+        let row3_fill_sample = Point::new(250, row3_top + 2);
+
+        assert_eq!(fb_a.pixel(row4_fill_sample), palette::SURFACE_ELEVATED, "row 4 should be selected in frame A");
+        assert_ne!(fb_a.pixel(row3_fill_sample), palette::SURFACE_ELEVATED, "row 3 should not be selected in frame A");
+
+        view.on_intent(NavIntent::Prev); // selected=3, still within [2, 5)
+        assert_eq!(view.selected_index(), Some(3));
+
+        let mut fb_b = FrameBuffer565::new(320, 150);
+        view.render(AREA, &mut fb_b).unwrap();
+
+        assert_eq!(
+            view.top_index.get(),
+            top_after_scrolling_down,
+            "moving up into an already-visible row must not scroll the list"
+        );
+        assert_eq!(
+            fb_a.pixel(non_selected_row_sample),
+            fb_b.pixel(non_selected_row_sample),
+            "a non-selected, still-visible row's pixels must not shift when the selection moves within the window"
+        );
+        assert_ne!(fb_b.pixel(row4_fill_sample), palette::SURFACE_ELEVATED, "row 4 should no longer be selected in frame B");
+        assert_eq!(fb_b.pixel(row3_fill_sample), palette::SURFACE_ELEVATED, "row 3 should now be selected in frame B -- the highlight moved");
     }
 
     #[test]
