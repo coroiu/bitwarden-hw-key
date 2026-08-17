@@ -33,7 +33,14 @@ embassy = [
 # yet. Must never be part of `default` -- the honest-empty-vault
 # behavior of `NoSyncSource` (see `main.rs`'s module doc) is a real
 # product property, not a placeholder to casually override.
-demo-seed = ["dep:uuid"]
+#
+# Also turns on `bhk-core/frame-timing` (bead ai-bitwarden-hw-key-ego):
+# the whole point of seeding a non-empty list is to have something to
+# scroll and *feel* refresh-rate/smoothness problems on, so bundling the
+# render/flush timing diagnostics into this same opt-in feature is
+# convenient rather than requiring two separate `--features` flags for
+# what's currently always used together during this investigation.
+demo-seed = ["dep:uuid", "bhk-core/frame-timing"]
 
 [dependencies]
 bhk-core = { path = "../core" }
