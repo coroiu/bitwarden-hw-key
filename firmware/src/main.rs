@@ -73,7 +73,6 @@ fn main() -> Result<(), EspError> {
         peripherals.lcd_mosi,
         peripherals.lcd_cs,
         peripherals.lcd_dc,
-        peripherals.lcd_reset,
         peripherals.lcd_backlight,
         peripherals.peripheral_power_on,
     )

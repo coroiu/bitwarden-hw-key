@@ -21,12 +21,19 @@
 //! directly). This adapter uses `mipidsi::interface::SpiInterface`; only
 //! `mipidsi` itself was added to `firmware/Cargo.toml`.
 //!
-//! # What is unverified
+//! # Hardware status
 //!
-//! See `board_config`'s module doc for the full list (pin electrical
-//! behavior, `mipidsi`'s generic ST7789 init vs. `LilyGo`'s vendor-tuned
-//! gamma table, orientation/mirroring). Nothing in this file has been
-//! run against a real panel — only compiled for `xtensa-esp32s3-espidf`.
+//! **HARDWARE-CONFIRMED** on a real Lilygo T-Embed CC1101 (bead
+//! ai-bitwarden-hw-key-c6e / ai-bitwarden-hw-key-dvm): boots to a stable
+//! main loop with no panic, and the panel is confirmed by direct human
+//! observation to be right-side up, correctly filling the panel (no
+//! offset/cropping), with correct colors. That covers `display_size`,
+//! `display_offset`, `invert_colors`, and `orientation` below. What
+//! remains unverified: whether `mipidsi`'s generic ST7789 init sequence
+//! matches `LilyGo`'s vendor-tuned gamma/porch-timing table closely
+//! enough for contrast/gamma fidelity (only confirmed "correct colors",
+//! not pixel-perfect factory-firmware parity), and the SPI baud rate
+//! ceiling (see `SPI_BAUDRATE_MHZ`, still untuned).
 
 use bhk_core::platform::{DisplaySurface, FrameBuffer565};
 use embedded_graphics::Pixel;
@@ -37,8 +44,8 @@ use esp_idf_hal::spi::{SpiDeviceDriver, SpiDriver};
 use esp_idf_hal::sys::EspError;
 use mipidsi::interface::{SpiError as MipidsiSpiError, SpiInterface};
 use mipidsi::models::ST7789;
-use mipidsi::options::{ColorOrder, Orientation, Rotation};
-use mipidsi::{Builder, Display};
+use mipidsi::options::{ColorInversion, ColorOrder, Orientation, Rotation};
+use mipidsi::{Builder, Display, NoResetPin};
 
 use crate::board::board_config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
@@ -46,7 +53,11 @@ type Spi = SpiDeviceDriver<'static, SpiDriver<'static>>;
 type CtrlPin = PinDriver<'static, AnyOutputPin, Output>;
 type Interface = SpiInterface<'static, Spi, CtrlPin>;
 type InterfaceError = MipidsiSpiError<esp_idf_hal::spi::SpiError, GpioError>;
-type MipidsiDisplay = Display<Interface, ST7789, CtrlPin>;
+// `NoResetPin`, not `CtrlPin`: this board (T-Embed CC1101) has no LCD
+// hardware reset line (`TFT_RST = -1` in LilyGo's own
+// `Setup214_LilyGo_T_Embed_PN532.h`) — see `St7789Surface::new`'s doc for
+// what `mipidsi` does instead when `.reset_pin()` is never called.
+type MipidsiDisplay = Display<Interface, ST7789, NoResetPin>;
 
 /// Scratch buffer `SpiInterface` batches pixel data through before each
 /// SPI write. Larger is generally faster (fewer, bigger SPI
@@ -77,8 +88,9 @@ const SPI_BAUDRATE_MHZ: u32 = 20;
 /// max_width` where `max_width` comes from `MODEL::FRAMEBUFFER_SIZE`)
 /// and `src/models/st7789.rs`'s `FRAMEBUFFER_SIZE = (240, 320)`; the
 /// real-hardware boot-loop panic this constant fixes is on first T-Embed
-/// flash, per bead ai-bitwarden-hw-key-c6e (fix itself not yet
-/// hardware-verified as of writing, see that bead for status).
+/// flash, per bead ai-bitwarden-hw-key-c6e. Hardware-verified: with this
+/// fix, boot reaches a stable "Entering main loop" with no panic/reboot
+/// loop.
 /// `Orientation::Deg90` below then rotates this native 170x320 into the
 /// 320x170 landscape the core expects.
 const NATIVE_WIDTH: u16 = 170;
@@ -97,7 +109,12 @@ pub enum St7789SurfaceInitError {
     /// Failed to acquire or configure a GPIO/SPI peripheral.
     Peripheral(EspError),
     /// `mipidsi`'s panel init sequence failed.
-    Display(mipidsi::InitError<InterfaceError, GpioError>),
+    ///
+    /// The reset-pin error type is `core::convert::Infallible`, not
+    /// `GpioError`: this board has no LCD hardware reset pin, so `mipidsi`
+    /// uses its `NoResetPin` marker type (see `MipidsiDisplay`'s doc
+    /// comment), whose `OutputPin` impl can never fail.
+    Display(mipidsi::InitError<InterfaceError, core::convert::Infallible>),
 }
 
 impl From<EspError> for St7789SurfaceInitError {
@@ -133,7 +150,8 @@ pub struct St7789Surface {
     display: MipidsiDisplay,
     backlight: CtrlPin,
     /// Kept alive for as long as the display is: dropping this would
-    /// (per `LilyGo`'s own `tft.ino`) cut power to the panel. Never read
+    /// (per T-Embed-CC1101's own `factory.cpp`, which drives
+    /// `BOARD_PWR_EN` low on shutdown) cut power to the panel. Never read
     /// after `new`, hence `#[allow(dead_code)]`-shaped usage — its job is
     /// existing, not being called.
     _peripheral_power: CtrlPin,
@@ -162,16 +180,16 @@ impl St7789Surface {
         mosi: AnyOutputPin,
         cs: AnyOutputPin,
         dc: AnyOutputPin,
-        reset: AnyOutputPin,
         backlight: AnyOutputPin,
         peripheral_power_on: AnyOutputPin,
     ) -> Result<Self, St7789SurfaceInitError> {
         let mut peripheral_power = PinDriver::output(peripheral_power_on)?;
-        // Per LilyGo's `tft.ino`: PIN_POWER_ON must be driven high before
-        // `tft.begin()` or the panel's power rail is off entirely. The
-        // settle delay before touching SPI is a guess (untested) — long
-        // enough to be safe on a busy-wait, not derived from a rail
-        // spec sheet we don't have.
+        // Per T-Embed-CC1101's own `factory.cpp` `setup()`: `BOARD_PWR_EN`
+        // must be driven high before `board_spi_init_shared_bus()` or the
+        // panel's shared power rail is off entirely. The settle delay
+        // before touching SPI is a guess (untested) — long enough to be
+        // safe on a busy-wait, not derived from a rail spec sheet we
+        // don't have.
         peripheral_power.set_high()?;
         Delay::new_default().delay_ms(10);
 
@@ -190,7 +208,6 @@ impl St7789Surface {
         )?;
 
         let dc_pin = PinDriver::output(dc)?;
-        let reset_pin = PinDriver::output(reset)?;
         let mut backlight_pin = PinDriver::output(backlight)?;
 
         // `SpiInterface` needs a `&'static mut [u8]` scratch buffer, and
@@ -206,16 +223,57 @@ impl St7789Surface {
 
         let mut delay = Delay::new_default();
         let display = Builder::new(ST7789, interface)
-            .reset_pin(reset_pin)
+            // No `.reset_pin(...)` call: this board has no LCD hardware
+            // reset line (see `MipidsiDisplay`'s doc comment above). With
+            // no reset pin configured, `mipidsi`'s `Builder::init` (confirmed
+            // by reading `mipidsi-0.10.0`'s `src/builder.rs`) sends a
+            // `SoftReset` DCS command instead of toggling a GPIO — this is
+            // the intended, supported "no hardware reset" path, not a
+            // workaround.
             .display_size(NATIVE_WIDTH, NATIVE_HEIGHT)
+            // Column/row start offset for this exact 170-wide ST7789
+            // panel: the T-Embed-CC1101 repo's vendored
+            // `lib/TFT_eSPI/TFT_Drivers/ST7789_Rotation.h` `setRotation()`
+            // table gives different `colstart`/`rowstart` per TFT_eSPI
+            // rotation index because TFT_eSPI pre-computes the offset
+            // already remapped into each rotation's register frame.
+            // `mipidsi` instead wants the offset in the NATIVE
+            // (rotation-0/portrait) frame and remaps it itself at address-
+            // window time (confirmed by reading `mipidsi-0.10.0`'s
+            // `Display::set_address_window` in `src/lib.rs`, which applies
+            // `MemoryMapping::from(orientation)` to the raw
+            // `display_offset` for every window write) — so the right
+            // source row is TFT_eSPI's rotation index **0** (Portrait),
+            // not 1/3 (Landscape): for `_init_width == 170` that's
+            // `colstart = 35, rowstart = 0`, i.e. `display_offset(35, 0)`.
+            // `display_offset(0, 35)` (the landscape-table value, wrongly
+            // assumed to already be native-frame) failed fast with
+            // `InvalidConfiguration(InvalidDisplayOffset)` —
+            // NATIVE_HEIGHT (320) + 35 > `ST7789::FRAMEBUFFER_SIZE.1`
+            // (320) — which is exactly the arithmetic proof that offset
+            // belongs on the 170-wide axis, not the 320-tall one.
+            // HARDWARE-CONFIRMED CORRECT on real T-Embed CC1101:
+            // `display_offset(35, 0)` fills the panel exactly, no
+            // cropping/blank margin.
+            .display_offset(35, 0)
             .color_order(ColorOrder::Rgb)
-            // TODO: verify on hardware. `tft.ino` uses
-            // `tft.setRotation(3)` (TFT_eSPI's rotation index 3) to get
-            // 320x170 landscape; the equivalent mipidsi `Orientation` has
-            // not been confirmed against a real panel; landscape at all
-            // (vs. a rotated/mirrored image) is the only thing that's a
-            // reasonably confident guess here.
-            .orientation(Orientation::new().rotate(Rotation::Deg90))
+            // Required for this panel: LilyGo's own T-Embed-CC1101
+            // `Setup214_LilyGo_T_Embed_PN532.h` (the TFT_eSPI config for
+            // this exact board/panel revision) sets `TFT_INVERSION_ON`.
+            // Without this, ST7789 panels commonly render inverted/wrong
+            // colors (the classic ST7789 "looks wrong" symptom).
+            // HARDWARE-CONFIRMED CORRECT on real T-Embed CC1101: colors
+            // match expectations with this set.
+            .invert_colors(ColorInversion::Inverted)
+            // `Rotation::Deg90` rendered the image upside down on real
+            // hardware. `tft.ino`/the factory firmware use
+            // `tft.setRotation(3)` (TFT_eSPI's "Inverted landscape"
+            // rotation index), the other of the two 320x170 landscape
+            // options from `ST7789_Rotation.h` alongside index 1 (`Deg90`'s
+            // apparent equivalent) — so `Deg270` is the other landscape
+            // choice. HARDWARE-CONFIRMED CORRECT on real T-Embed CC1101:
+            // right-side up, matching the factory firmware's orientation.
+            .orientation(Orientation::new().rotate(Rotation::Deg270))
             .init(&mut delay)
             .map_err(St7789SurfaceInitError::Display)?;
 
