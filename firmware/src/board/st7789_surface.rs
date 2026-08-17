@@ -62,6 +62,28 @@ const SPI_TRANSFER_BUFFER_LEN: usize = 2048;
 /// TODO: verify on hardware and raise if stable.
 const SPI_BAUDRATE_MHZ: u32 = 20;
 
+/// The ST7789V panel's NATIVE, unrotated dimensions (170 wide x 320
+/// tall, portrait), as required by `mipidsi::Builder::display_size`.
+///
+/// This is **not** the same as `DISPLAY_WIDTH`/`DISPLAY_HEIGHT` in
+/// `board_config`, which are the logical/landscape size (320x170) that
+/// the core renders into and that `flush` blits in rotated space.
+/// `mipidsi` validates `display_size` against the model's
+/// `FRAMEBUFFER_SIZE` (240x320 for `ST7789`) *before* rotation is
+/// applied, so passing the landscape 320x170 here overflows the model's
+/// 240 max width and mipidsi rejects the config with
+/// `InvalidConfiguration(InvalidDisplaySize)`. Confirmed by reading
+/// `mipidsi-0.10.0`'s `src/builder.rs` `init()` check (`width >
+/// max_width` where `max_width` comes from `MODEL::FRAMEBUFFER_SIZE`)
+/// and `src/models/st7789.rs`'s `FRAMEBUFFER_SIZE = (240, 320)`; the
+/// real-hardware boot-loop panic this constant fixes is on first T-Embed
+/// flash, per bead ai-bitwarden-hw-key-c6e (fix itself not yet
+/// hardware-verified as of writing, see that bead for status).
+/// `Orientation::Deg90` below then rotates this native 170x320 into the
+/// 320x170 landscape the core expects.
+const NATIVE_WIDTH: u16 = 170;
+const NATIVE_HEIGHT: u16 = 320;
+
 /// Errors from [`St7789Surface::new`].
 ///
 /// `#[allow(dead_code)]`: both variants' inner values are read only
@@ -185,7 +207,7 @@ impl St7789Surface {
         let mut delay = Delay::new_default();
         let display = Builder::new(ST7789, interface)
             .reset_pin(reset_pin)
-            .display_size(DISPLAY_WIDTH, DISPLAY_HEIGHT)
+            .display_size(NATIVE_WIDTH, NATIVE_HEIGHT)
             .color_order(ColorOrder::Rgb)
             // TODO: verify on hardware. `tft.ino` uses
             // `tft.setRotation(3)` (TFT_eSPI's rotation index 3) to get
