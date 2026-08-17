@@ -2,7 +2,7 @@
 
 High-level vision and milestones for the Bitwarden Hardware Key proof-of-concept.
 
-**Last Updated**: 2026-08-17 (M1.5 Phase 2 design complete: USB-Serial-JTAG transport + device-link protocol decided)
+**Last Updated**: 2026-08-17 (M1.5 Phase 2 design complete: USB-Serial-JTAG transport + device-link protocol decided; M2 output direction decided = BLE HID)
 
 ## Project Vision
 
@@ -115,8 +115,7 @@ becomes a fallback/dev aid rather than the product path.
 **Decision**: [2026-08-12-web-companion-local-server.md](./decisions/2026-08-12-web-companion-local-server.md)
 
 ### M2: Type it (portable vault payoff)
-- Credential output over **USB HID and/or BLE HID** (USB the likely primary demo path:
-  no pairing, reliable; BLE the cable-free story).
+- **Credential output over BLE HID** (DECIDED 2026-08-17). Rationale: USB HID requires TinyUSB and the irreversible USB_PHY_SEL eFuse burn, losing the normal flash/monitor development path on the board (see [2026-08-17-phase2-usb-transport-jtag-first.md](./decisions/2026-08-17-phase2-usb-transport-jtag-first.md)). BLE HID avoids this entirely. Important consequence: Phase 2 USB-Serial-JTAG sync transport is now durable (vault sync over USB-serial and typing over BLE are independent transports with no shared-PHY conflict), rather than a temporary bridge to a TinyUSB composite. Note: for historical context, earlier drafts considered USB HID the primary demo path; that was before the eFuse irreversibility became clear. BLE HID's own forward work (pairing, bonding, BLE stack e.g. esp32-nimble) is anticipated in M4.
 - Companion app continues to push fresh vault data as needed.
 - Desktop simulation of typing for the emulated run modes.
 - *Done when:* unlock, browse, type a credential into a real login form, end to end. This is the demo.
