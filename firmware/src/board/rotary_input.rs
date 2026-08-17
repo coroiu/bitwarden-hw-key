@@ -186,6 +186,16 @@ impl InputSource for RotaryEncoderInput {
         }
         self.button.reset();
 
+        // Debug aid for on-hardware verification (bead ekd): confirms the
+        // encoder->NavIntent path is alive over serial, independent of
+        // whatever the screen shows. Not feature-gated (unlike
+        // `main`'s `demo-seed`) since it's not fake data, just a log
+        // line -- cheap enough to leave in permanently, but revisit if it
+        // turns out to spam the log once real usage starts.
+        for intent in &intents {
+            log::info!("RotaryEncoderInput: emitting {intent:?}");
+        }
+
         intents
     }
 }

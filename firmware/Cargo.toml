@@ -26,6 +26,14 @@ embassy = [
   "esp-idf-svc/critical-section",
   "esp-idf-svc/embassy-time-driver",
 ]
+# TEMPORARY hardware-test aid (bead ai-bitwarden-hw-key-ekd), OFF by
+# default: seeds a handful of placeholder `VaultItem`s in `main.rs` so
+# the credential list is navigable on real hardware for verifying the
+# T-Embed CC1101 encoder-pin fix, even though there is no sync transport
+# yet. Must never be part of `default` -- the honest-empty-vault
+# behavior of `NoSyncSource` (see `main.rs`'s module doc) is a real
+# product property, not a placeholder to casually override.
+demo-seed = ["dep:uuid"]
 
 [dependencies]
 bhk-core = { path = "../core" }
@@ -53,6 +61,13 @@ rotary-encoder-hal = "0.6"
 # `esp_idf_hal::gpio::PinDriver` directly as a `PinWrapper` with no
 # wrapper type.
 button-driver = { version = "0.2", features = ["esp", "std", "embedded_hal"] }
+# Only pulled in by the off-by-default `demo-seed` feature (see
+# `[features]` above), to build placeholder `VaultItem` ids. Same
+# version/feature spec as `core/Cargo.toml`'s own `uuid` dependency
+# (already proven to build for this xtensa-esp32s3-espidf target via
+# `bhk-core`'s transitive dependency), so this doesn't introduce a new
+# unverified dependency, just makes it directly callable from `main.rs`.
+uuid = { version = "1.8.0", features = ["v4"], optional = true }
 
 [build-dependencies]
 embuild = { version = "0.33", features = ["espidf"] }

@@ -55,6 +55,40 @@ impl SyncSource for NoSyncSource {
     }
 }
 
+/// **TEMPORARY hardware-test aid** (bead ai-bitwarden-hw-key-ekd), gated
+/// behind the off-by-default `demo-seed` cargo feature. Seeds a handful
+/// of placeholder credentials purely so the credential list has
+/// something to scroll through, to verify the T-Embed CC1101
+/// encoder-pin fix (`NavIntent`s reaching the app and moving selection)
+/// on real hardware while there is still no sync transport to populate
+/// the vault for real.
+///
+/// This does **not** relax the "`NoSyncSource` is honest" principle in
+/// this module's doc comment above: `main`'s default build (this
+/// feature OFF) still starts from an empty vault. This function only
+/// exists, and is only called, when `demo-seed` is explicitly enabled.
+#[cfg(feature = "demo-seed")]
+fn demo_vault_items() -> Vec<VaultItem> {
+    fn item(name: &str, username: &str) -> VaultItem {
+        VaultItem {
+            id: uuid::Uuid::new_v4(),
+            name: name.to_string(),
+            username: username.to_string(),
+            password: "hunter2".to_string(),
+            uri: None,
+            notes: None,
+        }
+    }
+
+    vec![
+        item("GitHub", "octocat"),
+        item("AWS Console", "root"),
+        item("Gmail", "andreas@example.com"),
+        item("Bank of Example", "acoroiu"),
+        item("Home Wi-Fi", "router-admin"),
+    ]
+}
+
 fn main() -> Result<(), EspError> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
@@ -83,8 +117,16 @@ fn main() -> Result<(), EspError> {
     let nvs_partition = EspDefaultNvsPartition::take()?;
     let storage = NvsStorage::new(nvs_partition)?;
 
+    #[cfg(feature = "demo-seed")]
+    let initial_items = {
+        log::warn!("demo-seed feature ENABLED: vault seeded with placeholder credentials, not real synced data -- this build is a hardware-test aid only, never ship it as default");
+        demo_vault_items()
+    };
+    #[cfg(not(feature = "demo-seed"))]
+    let initial_items: Vec<VaultItem> = Vec::new();
+
     let mut platform = BoardPlatform::new(display, input, storage);
-    let mut app = App::new(u32::from(DISPLAY_WIDTH), u32::from(DISPLAY_HEIGHT), Vec::new());
+    let mut app = App::new(u32::from(DISPLAY_WIDTH), u32::from(DISPLAY_HEIGHT), initial_items);
     let mut sync = NoSyncSource;
 
     log::info!("Entering main loop");
