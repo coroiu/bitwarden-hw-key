@@ -88,13 +88,14 @@ becomes a fallback/dev aid rather than the product path.
 
 **Architecture:** Local Rust server (axum + tokio) running the Bitwarden Rust SDK natively, serving a thin vanilla-JavaScript web UI over 127.0.0.1. Browser is UI only; server owns all device transport and secret handling.
 
-**Phase 1 (Current, no hardware required):**
+**Phase 1 (COMPLETE, 2026-08-17):**
 - Interactive web UI: login, view vault metadata, select items, sync to device
 - Device transport: HTTP POST to emulator `/api/sync` (reuses existing push-protocol wire types)
 - Real Bitwarden vault credentials synced and stored on emulator (headless or windowed)
-- Emulator can be tested by agents without hardware
+- End-to-end tested: live Bitwarden login (with 2FA), sync of 24-item vault, device renders list and detail views with masked passwords
+- Fixed: Bitwarden API client-version header requirement (eml.11)
 
-**Phase 2 (Overlaps M2, requires boards):**
+**Phase 2 (Next, overlaps M2, now unblocked by hardware arrival):**
 - Device transport: native BLE or USB serial to real T-Embed
 - Firmware gains a sync handler (new state machine for BLE/USB push protocol)
 - Web UI and server logic unchanged
@@ -106,7 +107,9 @@ becomes a fallback/dev aid rather than the product path.
 - Decrypted secret flows server -> device during sync; plaintext on-device (M4 hardening territory)
 - Zeroize on lock/logout
 
-**Done when:** Phase 1 complete (web UI + SDK integration + emulator sync verified), Phase 2 device transport in place and tested on T-Embed with M2 work.
+**Done when (Phase 1):** COMPLETE. Web UI + SDK integration + emulator sync verified against real Bitwarden vault.
+
+**Done when (Phase 2):** Device transport in place and tested on T-Embed with M2 work.
 
 **Decision**: [2026-08-12-web-companion-local-server.md](./decisions/2026-08-12-web-companion-local-server.md)
 
