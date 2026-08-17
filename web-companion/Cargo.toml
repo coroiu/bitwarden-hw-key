@@ -58,6 +58,17 @@ zeroize = "1"
 bitwarden-core = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6", features = [
     "internal",
 ] }
+# `PasswordManagerTokenHandler` (ai-bitwarden-hw-key-eml.11) -- `Client::new`
+# (used by `crate::state::build_client` before this bead) wires up
+# `bitwarden-core`'s `NoopTokenHandler`, which *panics* (`"Cannot set tokens
+# on NoopTokenHandler"`, bitwarden-core/src/auth/auth_tokens.rs) the moment a
+# password login actually succeeds and the SDK tries to persist the access
+# token it got back. This never surfaced against a mock/no-network target;
+# it only fires on a real, successful round trip to the live identity
+# server. `bitwarden-auth::token_management::PasswordManagerTokenHandler` is
+# the real implementation every production Bitwarden client (see `bw`,
+# crates/bw/src/main.rs) uses instead.
+bitwarden-auth = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
 bitwarden-vault = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
 bitwarden-sync = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
 bitwarden-api-api = { git = "https://github.com/bitwarden/sdk-internal", rev = "99ffb6ef5f07c1b344f0e8ceb4da37f27482e9f6" }
