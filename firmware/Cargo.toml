@@ -54,6 +54,16 @@ esp-idf-svc = { version = "0.51", default-features = false }
 # "alloc")]` in esp-idf-hal's own source since it boxes the callback
 # closure.
 esp-idf-hal = { version = "0.45", features = ["alloc"] }
+# `board::st7789_surface` calls `embedded_hal::spi::SpiDevice::write` /
+# `embedded_hal::digital::OutputPin::set_low/set_high` directly, via
+# fully-qualified trait syntax (bead ai-bitwarden-hw-key-ego's raw
+# DMA-backed blit, bypassing `mipidsi`'s `Interface` abstraction for the
+# hot path -- see that module's doc comment). Pinned to "1", matching
+# the exact version esp-idf-hal 0.45.2 itself depends on (confirmed by
+# reading its Cargo.toml), so Cargo resolves both to the same crate
+# instance rather than two incompatible trait copies -- the same reason
+# `embedded-svc`'s version below is pinned to what `esp-idf-svc` uses.
+embedded-hal = "1"
 # `embedded_svc::storage::RawStorage` (get_raw/set_raw/len) is what
 # `board::nvs_storage::NvsStorage` uses against `EspNvs`. Pinned to the
 # same 0.28 esp-idf-svc 0.51 already depends on, so Cargo resolves both
