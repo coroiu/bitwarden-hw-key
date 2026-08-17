@@ -83,6 +83,10 @@ USB HID typing requires TinyUSB (if USB is the chosen output channel) and theref
 
 **No decision is pre-determined; all paths remain open and will be re-evaluated at M2.**
 
+### Follow-Up (2026-08-17): M2 Output Direction Resolved as BLE HID
+
+The M2 output direction was decided as BLE HID (2026-08-17), resolving this ADR's open deferral of the choice. Consequence: TinyUSB is not expected to be needed on this board for the foreseeable future, making the USB-Serial-JTAG sync transport durable rather than a temporary staging ground. WS2's JTAG byte-driver is no longer anticipated to be throwaway; the protocol layer (device-link) will continue to abstract the byte-stream regardless of transport, but the underlying channel stability is improved. See [roadmap.md M2 section](../roadmap.md) for the rationale (eFuse irreversibility, independent transport isolation).
+
 ## Related Decisions
 
 - **[2026-08-17-device-link-serial-framing-protocol.md](2026-08-17-device-link-serial-framing-protocol.md)**: The device-link protocol crate and framing system that rides on top of this transport (USB-Serial-JTAG now, flexible to other byte-drivers later).

@@ -121,6 +121,9 @@ Two architectural decisions formalize Phase 2 scope and close design uncertainty
 - `ai-bitwarden-hw-key-8kx`: Credential detail-view scroll (deferred from M0 closure).
 - `ai-bitwarden-hw-key-2ed`, `2ox`, `nrv`, `dje`, `ekd`: M1.5 Phase 2 workstreams (transport, firmware handler, web-companion client).
 
+**M2 Output Direction Decided (2026-08-17):**
+M2 output direction decided = BLE HID (avoids the irreversible USB eFuse burn; makes Phase 2 USB-serial sync durable). Rationale in ADR and roadmap.md M2 section.
+
 ---
 
 ### M0 (Platform Migration): COMPLETE (2026-08-17)
