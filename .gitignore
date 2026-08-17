@@ -17,3 +17,6 @@ headless_scene.png
 # and config tracked, so task history is shared via git. Do NOT blanket-ignore
 # .beads/ here — it would override that and make the board local-only.
 .mcp.json
+
+# local git worktrees for bead work
+.worktrees/
