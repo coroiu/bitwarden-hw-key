@@ -2,7 +2,7 @@
 
 High-level vision and milestones for the Bitwarden Hardware Key proof-of-concept.
 
-**Last Updated**: 2026-08-12
+**Last Updated**: 2026-08-17
 
 ## Project Vision
 
@@ -51,21 +51,20 @@ becomes a fallback/dev aid rather than the product path.
 
 ## Milestones
 
-### M0: Platform migration (emulator milestone complete, on-hardware validation pending)
+### M0: Platform migration (on-hardware validation COMPLETE)
 
-**Status (2026-08-12):** All nine workstreams W1–W9 of epic `ai-bitwarden-hw-key-8d7` completed and merged to main.
+**Status (2026-08-17):** COMPLETE. All nine workstreams W1-W9 of epic `ai-bitwarden-hw-key-8d7` completed and merged to main. Full on-hardware validation complete on physical Lilygo T-Embed CC1101 board.
 
 **Emulator Milestone (Done):**
 - Green-field UI framework redesigned and implemented on embedded-graphics + u8g2-fonts.
 - Three run modes formalized: headless (agent-driven, screenshot-inspected), windowed (minifb, human, no hardware), real-target (T-Embed).
-- SDK feasibility spike completed: verdict is NO-GO for on-device Bitwarden Rust SDK (ring won't link on xtensa; bitwarden-crypto not modular). Decision: device uses companion-app push model for M0–M2 (see [2026-08-11-sync-direction-companion-push.md](./decisions/2026-08-11-sync-direction-companion-push.md)).
+- SDK feasibility spike completed: verdict is NO-GO for on-device Bitwarden Rust SDK (ring won't link on xtensa; bitwarden-crypto not modular). Decision: device uses companion-app push model for M0-M2 (see [2026-08-11-sync-direction-companion-push.md](./decisions/2026-08-11-sync-direction-companion-push.md)).
 - Empty-but-real 320x170 color shell running, keyboard-drivable in windowed mode, fully agent-drivable + observable in headless mode via HTTP NavIntent injection and screenshot capture.
 - Credential-list shell operational with selection navigation verified.
 
-**On-Hardware Validation (In Progress):**
-- T-Embed ESP32-S3 board adapter code (W6) is build-only; physical hardware verification pending arrival of the board.
-- Tracked in bead `ai-bitwarden-hw-key-dvm` (on-device verification when hardware arrives).
-- *Done when:* on-T-Embed hardware, the color shell runs and is drivable by the rotary encoder. M0 epic closes after this validation.
+**On-Hardware Validation (Complete 2026-08-17):**
+- T-Embed CC1101 board brought up on real hardware for the first time. ST7789 display (Rotation::Deg270, native 170x320 size, software reset, color inversion), CC1101 pinmap (SCLK/MOSI/CS GPIO11/9/41, DC GPIO16, backlight GPIO21, encoder GPIO4/5, button GPIO0), GPIO edge-interrupt quadrature decoding, detail-view stack overflow fix (sdkconfig.defaults to workspace root, stack size 32KB), demo-seed feature. All display, color, encoder, and navigation stacks hardware-verified.
+- M0 epic `ai-bitwarden-hw-key-8d7` closed after validation (merge commit ef3daf6).
 
 ### M1: Vault browse (portable vault, part 1) [DEVICE DISPLAY COMPLETE]
 
@@ -95,7 +94,7 @@ becomes a fallback/dev aid rather than the product path.
 - End-to-end tested: live Bitwarden login (with 2FA), sync of 24-item vault, device renders list and detail views with masked passwords
 - Fixed: Bitwarden API client-version header requirement (eml.11)
 
-**Phase 2 (Next, overlaps M2, now unblocked by hardware arrival):**
+**Phase 2 (Next, overlaps M2, unblocked as of 2026-08-17):**
 - Device transport: native BLE or USB serial to real T-Embed
 - Firmware gains a sync handler (new state machine for BLE/USB push protocol)
 - Web UI and server logic unchanged
