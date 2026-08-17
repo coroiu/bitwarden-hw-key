@@ -40,7 +40,13 @@ bhk-core = { path = "../core" }
 log = { version = "0.4", default-features = false }
 embedded-graphics = "0.8.1"
 esp-idf-svc = { version = "0.51", default-features = false }
-esp-idf-hal = "0.45"
+# "alloc" (off by default for esp-idf-hal 0.45) is required for
+# `PinDriver::subscribe`, which `board::rotary_input` uses to install
+# GPIO edge-interrupt ISR callbacks for the encoder's quadrature decode
+# (bead ai-bitwarden-hw-key-47d) -- `subscribe` is `#[cfg(feature =
+# "alloc")]` in esp-idf-hal's own source since it boxes the callback
+# closure.
+esp-idf-hal = { version = "0.45", features = ["alloc"] }
 # `embedded_svc::storage::RawStorage` (get_raw/set_raw/len) is what
 # `board::nvs_storage::NvsStorage` uses against `EspNvs`. Pinned to the
 # same 0.28 esp-idf-svc 0.51 already depends on, so Cargo resolves both
@@ -49,7 +55,6 @@ embedded-svc = { version = "0.28", default-features = false }
 # T-Embed (ESP32-S3) board adapter, W6: real ST7789 panel driver and
 # rotary-encoder quadrature decoder. See `board/` for the trait impls.
 mipidsi = "0.10"
-rotary-encoder-hal = "0.6"
 # `board::rotary_input` reuses this for the encoder's push-button
 # (debounce/click/long-press) instead of hand-rolling it again. The
 # original `esp_input.rs` enabled only "esp"/"std" and worked around the
