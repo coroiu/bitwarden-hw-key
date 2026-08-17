@@ -2,7 +2,7 @@
 
 High-level vision and milestones for the Bitwarden Hardware Key proof-of-concept.
 
-**Last Updated**: 2026-08-17
+**Last Updated**: 2026-08-17 (M1.5 Phase 2 design complete: USB-Serial-JTAG transport + device-link protocol decided)
 
 ## Project Vision
 
@@ -95,9 +95,11 @@ becomes a fallback/dev aid rather than the product path.
 - Fixed: Bitwarden API client-version header requirement (eml.11)
 
 **Phase 2 (Next, overlaps M2, unblocked as of 2026-08-17):**
-- Device transport: native BLE or USB serial to real T-Embed
-- Firmware gains a sync handler (new state machine for BLE/USB push protocol)
+- **Device transport decided**: USB-Serial-JTAG (Phase 2), defer TinyUSB to M2. TinyUSB blocked by `esp-idf-sys#377` and requires irreversible USB_PHY_SEL eFuse burn; USB-Serial-JTAG is immediately viable and preserves dev loop. (See [2026-08-17-phase2-usb-transport-jtag-first.md](./decisions/2026-08-17-phase2-usb-transport-jtag-first.md).)
+- **Wire protocol decided**: device-link crate (binary framing, 11-message multiplex for sync/verify/logs, CBOR payloads reusing push_protocol types). (See [2026-08-17-device-link-serial-framing-protocol.md](./decisions/2026-08-17-device-link-serial-framing-protocol.md).)
+- Firmware gains a sync handler (device-link message receiver, state machine, on-device storage)
 - Web UI and server logic unchanged
+- **M2 Implication (note for later)**: USB HID typing requires TinyUSB and the same irreversible eFuse burn; this is a strong argument to prefer BLE HID for M2, or to accept a dedicated typing unit. No decision pre-determined; M2 will re-evaluate all paths (TinyUSB if unblocked, BLE HID, dedicated unit)
 
 **Security Posture (Accepted PoC):**
 - Bind server to 127.0.0.1 only

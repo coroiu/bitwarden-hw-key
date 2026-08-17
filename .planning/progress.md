@@ -96,6 +96,33 @@ Historical work from the initial Adafruit HUZZAH32 prototype. Treated as throwaw
 
 ## In Progress
 
+### M1.5 Phase 2 Design Complete (2026-08-17)
+
+**ADRs and Decisions Accepted:**
+
+Two architectural decisions formalize Phase 2 scope and close design uncertainty:
+
+1. **USB-Serial-JTAG transport (ADR 2026-08-17-phase2-usb-transport-jtag-first)**
+   - **Status**: Accepted
+   - **Basis**: Feasibility spike (bead `ai-bitwarden-hw-key-8bi`). TinyUSB blocked by `esp-idf-sys#377` (unresolved since June 2025); adoption requires irreversible USB_PHY_SEL eFuse burn, losing easy flash/monitor on that unit. USB-Serial-JTAG is immediately viable, keeps dev loop intact.
+   - **Outcome**: Phase 2 syncs over USB-Serial-JTAG (ROM CDC, no external controller). TinyUSB deferred to M2 with open re-evaluation.
+   - **M2 note**: USB HID typing also needs TinyUSB + eFuse burn. Strong case to prefer BLE HID for M2 or accept dedicated typing unit. No pre-decision.
+
+2. **Device-Link Serial Framing Protocol (ADR 2026-08-17-device-link-serial-framing-protocol)**
+   - **Status**: Accepted (implemented in Phase 2 WS1, merged to main, bead ai-bitwarden-hw-key-2ox.1)
+   - **Content**: Binary frame header (magic 0xB1 0x7C, type u8, flags, len u32 LE, payload, crc32 LE), 11-variant message multiplex (host->device: SyncBegin, SyncChunk, SyncEnd, InputInject, FramebufferRequest, Ping; device->host: SyncAck, SyncNack, FramebufferData, Log, Pong), CBOR-encoded structured payloads reusing `push_protocol::{SyncRequest, SyncResponse, Credential}` plus a `WireIntent` enum.
+   - **Outcome**: Portable protocol over any byte stream (USB-Serial-JTAG now, swappable later). Multiplexes sync, verify-seam (agent-driven NavIntent injection + framebuffer capture), and device logs. Closed bead `ai-bitwarden-hw-key-dvm` (real-target verification).
+
+**Phase 2 Epic (ai-bitwarden-hw-key-2ox):**
+- **WS1** (device-link crate, merged to main): Design and implement binary framing, message types, CBOR encoding/decoding, streaming reassembly.
+- **WS2-WS6** (scoped, hardware-gated): Firmware USB-Serial-JTAG driver, device-side message receiver, sync state machine, on-device storage integration, web-companion host-side USB client, verify-seam integration.
+
+**Follow-up beads (open):**
+- `ai-bitwarden-hw-key-8kx`: Credential detail-view scroll (deferred from M0 closure).
+- `ai-bitwarden-hw-key-2ed`, `2ox`, `nrv`, `dje`, `ekd`: M1.5 Phase 2 workstreams (transport, firmware handler, web-companion client).
+
+---
+
 ### M0 (Platform Migration): COMPLETE (2026-08-17)
 
 **Bead `ai-bitwarden-hw-key-8d7` (epic, CLOSED)** — all 9 workstreams W1-W9 completed and merged to main as of 2026-08-17:
