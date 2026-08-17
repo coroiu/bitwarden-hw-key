@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use bitwarden_auth::token_management::PasswordManagerTokenHandler;
 use bitwarden_core::{Client, ClientSettings, DeviceType};
 use push_protocol::Credential;
 use tokio::sync::Mutex;
@@ -61,15 +62,58 @@ pub enum Session {
 /// didn't reach `IdentityTokenResponse::Authenticated` never picks up any
 /// internal state worth keeping -- see eml.3 report for why re-using the
 /// client across a 2FA retry isn't necessary).
+///
+/// **Required client-identification headers (ai-bitwarden-hw-key-eml.11):**
+/// against the LIVE Bitwarden API, `ClientSettings::default()`'s bare
+/// `DeviceType::SDK` (with `bitwarden_client_version: None`) produced a
+/// `401` on every login attempt. The identity server's real error (visible
+/// server-side via `crate::auth_routes::log_login_error`, never forwarded to
+/// the browser) was:
+///
+/// ```text
+/// No client version header found, required to prevent encryption errors.
+/// Please confirm your client is supplying the header:
+/// "Bitwarden-Client-Version"
+/// ```
+///
+/// `bitwarden-core`'s `ClientBuilder::build` (sdk-internal rev 99ffb6ef,
+/// `crates/bitwarden-core/src/client/builder.rs::build_default_headers`)
+/// only emits `Bitwarden-Client-Version` when `ClientSettings::
+/// bitwarden_client_version` is `Some(_)` -- our `..ClientSettings::
+/// default()` left it `None`. Setting it here (to this crate's own
+/// `CARGO_PKG_VERSION`, mirroring how the official `bw` CLI in the same SDK
+/// repo -- `crates/bw/src/main.rs` -- populates this field from its own
+/// package version) is what the live API demands to accept a password-grant
+/// login.
+///
+/// **Required token handler (ai-bitwarden-hw-key-eml.11, second half):**
+/// fixing the header above got a *real* password login all the way to a
+/// successful identity-server response -- which then panicked server-side
+/// (`"Cannot set tokens on NoopTokenHandler"`,
+/// `bitwarden-core/src/auth/auth_tokens.rs`). `Client::new` wires up
+/// `bitwarden-core::NoopTokenHandler` (its own doc comment: "a client with
+/// default settings and a no-op token handler"), which cannot store the
+/// access token the SDK receives on a *successful* login -- a path that was
+/// never reached before the header fix, since every login attempt died at
+/// the identity server first. `bitwarden-auth::token_management::
+/// PasswordManagerTokenHandler` is the real implementation the official `bw`
+/// CLI uses for the same password-login flow (`crates/bw/src/main.rs`),
+/// wired up here the same way via `Client::new_with_token_handler`.
+/// Confirmed fixed end-to-end against a real account; see the eml.11
+/// completion report.
 #[must_use]
 pub fn build_client() -> Client {
     let settings = ClientSettings {
         identity_url: "https://identity.bitwarden.com".to_string(),
         api_url: "https://api.bitwarden.com".to_string(),
         device_type: DeviceType::SDK,
+        bitwarden_client_version: Some(env!("CARGO_PKG_VERSION").to_string()),
         ..ClientSettings::default()
     };
-    Client::new(Some(settings))
+    Client::new_with_token_handler(
+        Some(settings),
+        Arc::new(PasswordManagerTokenHandler::default()),
+    )
 }
 
 /// Unions every registered `TransportProvider`'s view of the world into one
