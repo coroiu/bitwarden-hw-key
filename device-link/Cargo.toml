@@ -10,23 +10,28 @@ rust-version = "1.77"
 # this crate must build unmodified on BOTH the xtensa firmware target (this
 # root workspace) and web-companion's own nested stable-Rust workspace
 # (ai-bitwarden-hw-key-eml.1), so its dependency tree stays deliberately
-# small.
+# small -- serde + ciborium + crc + push-protocol, same shape as
+# push-protocol's own dependency set.
 #
 # Path deps:
 # - push-protocol: reuse SyncRequest/SyncResponse/Credential verbatim so the
 #   CBOR blob carried inside SyncChunk frames is byte-for-byte what the
 #   existing HTTP+CBOR push protocol already produces -- no re-derivation,
 #   no drift.
-# - bhk-core: reuse NavIntent (the frozen semantic input vocabulary) for
-#   InputInject payloads. bhk-core is platform-free (no esp-idf-*/minifb/
-#   tiny_http/ssd1306) but NOT dependency-light like push-protocol -- it
-#   pulls in embedded-graphics/embedded-graphics-framebuf/u8g2-fonts for its
-#   render-layer code. Confirmed (WS1 report, ai-bitwarden-hw-key-2ox.1)
-#   that this compiles cleanly under both the esp toolchain and a plain
-#   stable toolchain (1.91.1, matching web-companion's pin), so it is not a
-#   build-breaker -- but it is a heavier transitive footprint than
-#   push-protocol's, worth a second look before WS4 links this crate into
-#   web-companion.
+#
+# Deliberately NO path dep on bhk-core. An earlier draft of this crate
+# depended on bhk-core purely to reuse `NavIntent` for InputInject payloads;
+# bhk-core compiles fine on a stable toolchain, but it pulls in
+# embedded-graphics/embedded-graphics-framebuf/u8g2-fonts for its
+# render-layer code, and web-companion/Cargo.toml documents (from
+# ai-bitwarden-hw-key-eml.1) a deliberate boundary that push-protocol pulls
+# in ONLY serde/ciborium/uuid, explicitly NOT bhk-core -- a web server has
+# no business linking an embedded rendering stack. `message::WireIntent`
+# (variant-parity with `bhk_core::NavIntent`, not a re-export of it) is
+# device-link's own wire type for InputInject instead; the firmware maps
+# `WireIntent <-> bhk_core::NavIntent` at the edge, exactly like the
+# existing `push_protocol::Credential <-> bhk_core::VaultItem` wire/domain
+# split this codebase already uses (see `emulator::credentials`).
 #
 # See: .planning/decisions (M1.5 Phase 2 device-link framing, per Ada's
 # design) and .planning/decisions/2026-08-11-sync-direction-companion-push.md.
@@ -36,7 +41,6 @@ serde = { version = "1.0", features = ["derive"] }
 ciborium = "0.2"
 crc = "3.4"
 push-protocol = { path = "../push-protocol" }
-bhk-core = { path = "../core" }
 
 [dev-dependencies]
 # Only for the lib.rs doctest, which builds a push_protocol::Credential

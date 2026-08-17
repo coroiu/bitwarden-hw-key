@@ -29,7 +29,7 @@ pub enum MessageType {
     SyncChunk = 0x02,
     /// Closes a `SyncChunk` sequence; payload is CBOR [`SyncEnd`].
     SyncEnd = 0x03,
-    /// CBOR-encoded `bhk_core::NavIntent`.
+    /// CBOR-encoded [`WireIntent`].
     InputInject = 0x04,
     /// Empty payload; requests a `FramebufferData` sequence in reply.
     FramebufferRequest = 0x05,
@@ -140,6 +140,37 @@ pub struct SyncBegin {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SyncEnd {
     pub crc32_of_whole_blob: u32,
+}
+
+/// Host -> Device, CBOR payload of [`MessageType::InputInject`]: a
+/// synthetic navigation input event for the agent verify-seam (WS5) to
+/// drive the on-device UI without physical rotary-encoder hardware.
+///
+/// This is the WIRE representation, deliberately NOT a re-export of
+/// `bhk_core::NavIntent`. `device-link` must not depend on `bhk-core`: this
+/// crate is linked into web-companion's host-side (nested, stable-Rust)
+/// workspace once WS4 wires up the host transport, and `bhk-core` pulls in
+/// `embedded-graphics`/`embedded-graphics-framebuf`/`u8g2-fonts` for its
+/// render-layer code -- a rendering stack a web server has no business
+/// linking. `WireIntent` has variant-for-variant parity with
+/// `bhk_core::NavIntent` by construction; the firmware (WS2/WS3, the only
+/// place that sees both crates) maps `WireIntent <-> bhk_core::NavIntent`
+/// at the edge, exactly like the existing `push_protocol::Credential <->
+/// bhk_core::VaultItem` wire/domain split this codebase already uses (see
+/// `emulator::credentials`'s `From<Credential> for VaultItem`). That's the
+/// established precedent this follows, not a new pattern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WireIntent {
+    /// Move to next item (encoder CW, arrow down, button down).
+    Next,
+    /// Move to previous item (encoder CCW, arrow up, button up).
+    Prev,
+    /// Jump forward N items (fast encoder rotation, held button, Pg Dn).
+    NextN(u16),
+    /// Select the focused item (encoder short press, space, enter).
+    Activate,
+    /// Return to parent / dismiss modal (encoder long press, esc, back).
+    Back,
 }
 
 /// Device -> Host, CBOR payload of [`MessageType::SyncNack`]: sync failed.
@@ -285,16 +316,16 @@ mod tests {
     }
 
     #[test]
-    fn cbor_roundtrip_nav_intent() {
+    fn cbor_roundtrip_wire_intent() {
         for intent in [
-            bhk_core::NavIntent::Next,
-            bhk_core::NavIntent::Prev,
-            bhk_core::NavIntent::NextN(7),
-            bhk_core::NavIntent::Activate,
-            bhk_core::NavIntent::Back,
+            WireIntent::Next,
+            WireIntent::Prev,
+            WireIntent::NextN(7),
+            WireIntent::Activate,
+            WireIntent::Back,
         ] {
             let bytes = to_cbor(&intent).unwrap();
-            let decoded: bhk_core::NavIntent = from_cbor(&bytes).unwrap();
+            let decoded: WireIntent = from_cbor(&bytes).unwrap();
             assert_eq!(intent, decoded);
         }
     }

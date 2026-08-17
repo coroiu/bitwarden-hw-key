@@ -77,11 +77,13 @@ pub use decoder::{DecodeError, Decoder};
 pub use frame::{encode_frame, EncodeError, Frame, FLAG_MORE, HEADER_LEN, MAGIC, MAX_PAYLOAD_LEN};
 pub use message::{
     from_cbor, to_cbor, CborError, DeviceDescriptor, FramebufferHeader, FramebufferHeaderError,
-    MessageType, PixelFormat, SyncBegin, SyncEnd, SyncNack, UnknownMessageType,
+    MessageType, PixelFormat, SyncBegin, SyncEnd, SyncNack, UnknownMessageType, WireIntent,
     FRAMEBUFFER_HEADER_LEN,
 };
 
-// Re-exported so callers building InputInject/SyncAck payloads don't need
-// a separate direct dependency purely to name these types.
-pub use bhk_core::NavIntent;
+// Re-exported so callers building SyncAck payloads don't need a separate
+// direct dependency purely to name these types. Deliberately NOT
+// re-exporting anything from `bhk-core` -- see `message::WireIntent`'s doc
+// comment and `Cargo.toml` for why this crate has no `bhk-core` dependency
+// at all.
 pub use push_protocol::{Credential, SyncRequest, SyncResponse};
