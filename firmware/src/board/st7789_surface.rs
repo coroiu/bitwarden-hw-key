@@ -32,8 +32,10 @@
 //! remains unverified: whether `mipidsi`'s generic ST7789 init sequence
 //! matches `LilyGo`'s vendor-tuned gamma/porch-timing table closely
 //! enough for contrast/gamma fidelity (only confirmed "correct colors",
-//! not pixel-perfect factory-firmware parity), and the SPI baud rate
-//! ceiling (see `SPI_BAUDRATE_MHZ`, still untuned).
+//! not pixel-perfect factory-firmware parity). `SPI_BAUDRATE_MHZ` was
+//! raised to 40MHz (bead ai-bitwarden-hw-key-ego, matching LilyGo's own
+//! factory-validated value) to fix visibly poor refresh rate; pending
+//! on-hardware confirmation the panel stays clean at that clock.
 
 use bhk_core::platform::{DisplaySurface, FrameBuffer565};
 use embedded_graphics::Pixel;
@@ -60,18 +62,38 @@ type InterfaceError = MipidsiSpiError<esp_idf_hal::spi::SpiError, GpioError>;
 type MipidsiDisplay = Display<Interface, ST7789, NoResetPin>;
 
 /// Scratch buffer `SpiInterface` batches pixel data through before each
-/// SPI write. Larger is generally faster (fewer, bigger SPI
-/// transactions) at the cost of RAM; 2KiB is an untuned starting point,
-/// not a measured optimum (there's no hardware here to profile against).
-const SPI_TRANSFER_BUFFER_LEN: usize = 2048;
-
-/// SPI clock for the display bus. ST7789 panels commonly tolerate well
-/// above this, but the T-Embed's specific panel/wiring has not been
-/// tested, so this starts conservative rather than guessing at the
-/// panel's real ceiling.
+/// SPI write. Larger means fewer, bigger SPI transactions (less
+/// per-transaction driver/DMA-setup overhead) at the cost of static RAM.
 ///
-/// TODO: verify on hardware and raise if stable.
-const SPI_BAUDRATE_MHZ: u32 = 20;
+/// Bumped 2048 -> 8192 (bead ai-bitwarden-hw-key-ego: refresh rate was
+/// visibly poor on real hardware — a full 320x170 Rgb565 frame is
+/// ~108KB, so at 2KiB/transfer that's ~53 SPI transactions per frame).
+/// 8KiB is a `Box::leak`'d static allocation (see its call site in
+/// `St7789Surface::new`), negligible against this board's free heap
+/// (hundreds of KiB per the boot `heap_init` log) — RAM was never the
+/// constraint here, so there's no reason to be stingier than "clearly
+/// affordable."
+const SPI_TRANSFER_BUFFER_LEN: usize = 8192;
+
+/// SPI clock for the display bus.
+///
+/// Bumped 20 -> 40 MHz (bead ai-bitwarden-hw-key-ego: refresh rate was
+/// visibly poor on real hardware — the previous 20MHz was an untested,
+/// deliberately conservative guess with a TODO to raise once verified).
+/// 40MHz is not a guess either: it's LilyGo's own factory-validated
+/// value for this exact panel/wiring, confirmed by reading
+/// `github.com/Xinyuan-LilyGO/T-Embed-CC1101`'s
+/// `lib/TFT_eSPI/User_Setups/Setup214_LilyGo_T_Embed_PN532.h`, which
+/// sets `SPI_FREQUENCY 40000000` (with a *commented-out* `27000000`
+/// fallback, i.e. LilyGo themselves moved past 27MHz to 40MHz for
+/// writes; `SPI_READ_FREQUENCY` stays at 20MHz, but this driver is
+/// write-only and never reads from the panel). Pending on-hardware
+/// confirmation that the panel stays clean (no
+/// corruption/tearing/glitching) at this clock; 80MHz is a plausible
+/// next step if 40MHz proves rock-solid and more headroom is wanted,
+/// but wasn't tried here since it would exceed what LilyGo's own
+/// factory firmware validated for this panel.
+const SPI_BAUDRATE_MHZ: u32 = 40;
 
 /// The ST7789V panel's NATIVE, unrotated dimensions (170 wide x 320
 /// tall, portrait), as required by `mipidsi::Builder::display_size`.
