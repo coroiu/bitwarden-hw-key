@@ -36,7 +36,11 @@ pub fn encode_chunks(
     let mut frames = Vec::new();
     let mut offset = 0;
     while offset < blob.len() {
-        let end = (offset + max_chunk_len).min(blob.len());
+        // Defensive: frames cap at MAX_PAYLOAD_LEN and real blobs are
+        // KB-scale, so this can't overflow in practice, but a protocol
+        // crate shouldn't have a latent panic on a pathological
+        // near-usize::MAX blob.
+        let end = offset.saturating_add(max_chunk_len).min(blob.len());
         let is_last = end == blob.len();
         let flags = if is_last { 0 } else { FLAG_MORE };
         frames.push(encode_frame(msg_type, flags, &blob[offset..end])?);
