@@ -21,7 +21,7 @@ use std::convert::Infallible;
 use embedded_graphics::{
     draw_target::DrawTarget,
     geometry::OriginDimensions,
-    pixelcolor::Rgb565,
+    pixelcolor::{IntoStorage, Rgb565},
     prelude::{Point, Size},
     Pixel,
 };
@@ -96,6 +96,42 @@ impl FrameBuffer565 {
     /// PNG or hand pixels to `minifb`.
     pub fn pixels(&self) -> impl Iterator<Item = Pixel<Rgb565>> + '_ {
         self.inner.into_iter()
+    }
+
+    /// Writes every pixel's RGB565 value into `out`, two bytes per pixel,
+    /// in row-major order, in **panel byte order** (big-endian / MSB
+    /// first) — the wire format the MIPI DCS `RAMWR` pixel stream expects
+    /// (ST7789 and most other RGB565 panels), regardless of the host
+    /// CPU's own endianness (xtensa is little-endian; the panel doesn't
+    /// care what the host is).
+    ///
+    /// This exists for a `DisplaySurface` that wants to bypass a
+    /// per-pixel draw-target/iterator abstraction for its hot blit path
+    /// (bead ai-bitwarden-hw-key-ego: the T-Embed's `St7789Surface`
+    /// blits this buffer's raw bytes directly over SPI in one large
+    /// transfer instead of going through `mipidsi`'s per-pixel
+    /// `set_pixels` iterator) — it deliberately reads the backing
+    /// `Vec<Rgb565>` directly (via [`FrameBuf`]'s public `data` field)
+    /// rather than through [`FrameBuffer565::pixels`]'s `FrameBuf`
+    /// iterator, which computes a `Point` per pixel that this bulk path
+    /// has no use for.
+    ///
+    /// Platform-neutral: no `unsafe`, no reinterpret-casting the backing
+    /// `Vec<Rgb565>`'s memory — just a straightforward per-pixel
+    /// `into_storage().to_be_bytes()` loop, so this stays valid for any
+    /// `DisplaySurface` on any host endianness, not just this project's
+    /// current little-endian xtensa target.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `out.len() != width() * height() * 2`.
+    pub fn write_be_bytes(&self, out: &mut [u8]) {
+        let colors: &[Rgb565] = &self.inner.data.0;
+        assert_eq!(out.len(), colors.len() * 2, "write_be_bytes: `out` must be exactly width*height*2 bytes");
+
+        for (chunk, color) in out.chunks_exact_mut(2).zip(colors) {
+            chunk.copy_from_slice(&color.into_storage().to_be_bytes());
+        }
     }
 }
 
@@ -176,5 +212,40 @@ mod tests {
 
         let colors: Vec<Rgb565> = fb.pixels().map(|Pixel(_, c)| c).collect();
         assert_eq!(colors, vec![Rgb565::RED, Rgb565::GREEN, Rgb565::BLUE, Rgb565::WHITE]);
+    }
+
+    #[test]
+    fn write_be_bytes_matches_row_major_order_and_big_endian_storage() {
+        use embedded_graphics::pixelcolor::IntoStorage;
+        use embedded_graphics::prelude::RgbColor;
+
+        let mut fb = FrameBuffer565::new(2, 2);
+        fb.inner.set_color_at(Point::new(0, 0), Rgb565::RED);
+        fb.inner.set_color_at(Point::new(1, 0), Rgb565::GREEN);
+        fb.inner.set_color_at(Point::new(0, 1), Rgb565::BLUE);
+        fb.inner.set_color_at(Point::new(1, 1), Rgb565::WHITE);
+
+        let mut bytes = [0u8; 8];
+        fb.write_be_bytes(&mut bytes);
+
+        let expected: Vec<u8> = [Rgb565::RED, Rgb565::GREEN, Rgb565::BLUE, Rgb565::WHITE]
+            .into_iter()
+            .flat_map(|c| c.into_storage().to_be_bytes())
+            .collect();
+        assert_eq!(bytes.to_vec(), expected, "must match pixels()'s row-major order, MSB first per pixel");
+
+        // Sanity-check big-endian specifically: RED in Rgb565 is a nonzero
+        // high byte (0xF800 >> ... the top 5 bits are the red channel), so
+        // if this were accidentally little-endian, byte 0 would be 0x00,
+        // not the true high byte.
+        assert_ne!(bytes[0], 0, "first byte of a RED pixel must be the high (MSB) byte, not 0 (which little-endian would produce)");
+    }
+
+    #[test]
+    #[should_panic(expected = "write_be_bytes: `out` must be exactly width*height*2 bytes")]
+    fn write_be_bytes_panics_on_wrong_buffer_size() {
+        let fb = FrameBuffer565::new(2, 2);
+        let mut too_small = [0u8; 4];
+        fb.write_be_bytes(&mut too_small);
     }
 }

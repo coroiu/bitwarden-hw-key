@@ -18,6 +18,14 @@
 //! }
 //! ```
 //!
+//! Note the `if app.dirty()` gate: render+flush only happen when
+//! something actually changed, not unconditionally every iteration — an
+//! idle loop (no input, no sync changes) still spins at `frame_budget`
+//! cadence but skips the expensive part entirely. The off-by-default
+//! `frame-timing` feature (bead ai-bitwarden-hw-key-ego) logs a rolling
+//! average of render/flush durations for exactly the frames that *do*
+//! take this path — see [`FrameTiming`].
+//!
 //! # Why `should_continue` instead of an unconditional `loop`
 //!
 //! A bare infinite loop is exactly right for the real-target firmware
@@ -46,6 +54,54 @@ use crate::app::App;
 use crate::platform::{Clock, DisplaySurface, InputSource, Platform};
 use crate::sync_source::SyncSource;
 
+/// Rolling-average frame-timing accumulator, active only behind the
+/// off-by-default `frame-timing` feature (bead ai-bitwarden-hw-key-ego).
+/// Diagnostic-only: measures where a *rendered* (dirty) frame's time
+/// actually goes -- render-into-framebuffer vs. flush-to-display -- using
+/// the same injected [`Clock`] the loop itself uses for its frame-budget
+/// sleep, so these numbers are directly comparable to `frame_budget`.
+///
+/// Only dirty frames are counted (a frame that skips render+flush
+/// entirely has nothing meaningful to report for either duration), so
+/// "30 frames" here means 30 *rendered* frames, however many total loop
+/// iterations that spans.
+#[cfg(feature = "frame-timing")]
+struct FrameTiming {
+    render_total: Duration,
+    flush_total: Duration,
+    count: u32,
+}
+
+#[cfg(feature = "frame-timing")]
+impl FrameTiming {
+    const WINDOW: u32 = 30;
+
+    const fn new() -> Self {
+        Self { render_total: Duration::ZERO, flush_total: Duration::ZERO, count: 0 }
+    }
+
+    /// Records one dirty frame's render/flush durations; logs and resets
+    /// the accumulator once `WINDOW` frames have been recorded.
+    fn record(&mut self, render: Duration, flush: Duration) {
+        self.render_total += render;
+        self.flush_total += flush;
+        self.count += 1;
+
+        if self.count >= Self::WINDOW {
+            let n = f64::from(self.count);
+            let avg_render_ms = self.render_total.as_secs_f64() * 1000.0 / n;
+            let avg_flush_ms = self.flush_total.as_secs_f64() * 1000.0 / n;
+            let avg_total_ms = avg_render_ms + avg_flush_ms;
+            let fps = if avg_total_ms > 0.0 { 1000.0 / avg_total_ms } else { 0.0 };
+            log::info!(
+                "frame-timing: render={avg_render_ms:.2}ms flush={avg_flush_ms:.2}ms total={avg_total_ms:.2}ms -> {fps:.1}fps (avg over {} rendered frames)",
+                self.count
+            );
+            *self = Self::new();
+        }
+    }
+}
+
 /// Runs the app loop against `platform` until `should_continue` returns
 /// `false`. `frame_budget` is the target time per iteration (input poll +
 /// app step + render + flush); if an iteration finishes early, the
@@ -64,6 +120,9 @@ pub fn run<P: Platform, S: SyncSource>(
 ) where
     S::Error: std::fmt::Display,
 {
+    #[cfg(feature = "frame-timing")]
+    let mut frame_timing = FrameTiming::new();
+
     while should_continue() {
         let frame_start = platform.clock().now();
 
@@ -72,7 +131,14 @@ pub fn run<P: Platform, S: SyncSource>(
         app.step(sync);
 
         if app.dirty() {
+            #[cfg(feature = "frame-timing")]
+            let render_start = platform.clock().now();
+
             let framebuffer = app.render();
+
+            #[cfg(feature = "frame-timing")]
+            let render_end = platform.clock().now();
+
             // A flush failure (e.g. a real SPI write error on hardware) is
             // not something this loop can meaningfully recover from frame
             // to frame; per the presentation-surface ADR, device-specific
@@ -80,6 +146,15 @@ pub fn run<P: Platform, S: SyncSource>(
             // into the platform-free core. Dropping it here (rather than
             // panicking) keeps the loop itself infallible.
             let _ = platform.display().flush(framebuffer);
+
+            #[cfg(feature = "frame-timing")]
+            {
+                let flush_end = platform.clock().now();
+                frame_timing.record(
+                    render_end.saturating_duration_since(render_start),
+                    flush_end.saturating_duration_since(render_end),
+                );
+            }
         }
 
         let elapsed = platform.clock().now().saturating_duration_since(frame_start);
