@@ -20,12 +20,12 @@ embedded-graphics-framebuf = "0.5.0"
 serde = { version = "1.0", features = ["derive"] }
 u8g2-fonts = { version = "0.5.2", features = ["embedded_graphics_textstyle"] }
 uuid = { version = "1.8.0", features = ["v4"] }
-# Only pulled in by the off-by-default "frame-timing" feature (see
-# [features] below) -- this crate otherwise has no logging dependency,
-# per its "platform-free" doc comment above (log's facade is trivially
-# portable, but there's no reason to pay even that for a diagnostic
-# feature nobody's using).
-log = { version = "0.4", default-features = false, optional = true }
+# No longer optional (bead ai-bitwarden-hw-key-mqk): `run::run` now
+# always logs persistently-failing `DisplaySurface::flush` calls
+# (rate-limited, see `run.rs`'s `FlushErrorTracker`) -- that's a
+# permanent robustness property, not a diagnostic opt-in like
+# `frame-timing` below, which still uses this same dependency.
+log = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 image = { version = "0.25.6", default-features = false, features = ["png"] }
@@ -38,4 +38,4 @@ image = { version = "0.25.6", default-features = false, features = ["png"] }
 # guessing. See `run.rs`'s `FrameTiming` for the exact measurement
 # points. Not meant to be a permanent feature -- revisit once the
 # refresh-rate investigation concludes.
-frame-timing = ["dep:log"]
+frame-timing = []

@@ -72,6 +72,55 @@ struct FrameTiming {
     count: u32,
 }
 
+/// Rate-limits `DisplaySurface::flush` failure logging so a
+/// persistently-failing display doesn't spam the log at frame rate.
+///
+/// Bead ai-bitwarden-hw-key-mqk: a DMA misconfiguration once made
+/// `flush` fail on *every single frame*, and because `run`'s loop
+/// discarded the `Result` outright, the screen just silently froze on
+/// the last good frame with no signal anywhere — it looked like a hang,
+/// not a failure, until someone happened to look at the actual panel.
+/// The loop must still stay infallible (per the presentation-surface
+/// ADR: device-specific errors are absorbed at the surface adapter, not
+/// propagated into the platform-free core) — this only adds
+/// *visibility*, logging a warning on the first failure (so a
+/// transition from healthy to broken is never silent) and then every
+/// [`FlushErrorTracker::REPEAT_INTERVAL`]th consecutive failure after
+/// that (so a *persistent* failure keeps showing up over serial without
+/// drowning normal operation in per-frame noise), resetting on the next
+/// success so a later failure logs fresh again.
+#[derive(Default)]
+struct FlushErrorTracker {
+    consecutive_errors: u32,
+}
+
+impl FlushErrorTracker {
+    /// Arbitrary, not tuned against a real failure's time-to-notice
+    /// requirement: at the 33ms/frame budget this is roughly every 5
+    /// seconds, which is frequent enough that a human watching serial
+    /// output won't wait long to see it repeat, without being frequent
+    /// enough to look like per-frame spam.
+    const REPEAT_INTERVAL: u32 = 150;
+
+    /// Records a failed `flush` and logs a warning if this is the first
+    /// failure since the last success, or every `REPEAT_INTERVAL`th one
+    /// after that.
+    fn on_err(&mut self, error: &impl core::fmt::Debug) {
+        self.consecutive_errors += 1;
+        if self.consecutive_errors == 1 || self.consecutive_errors % Self::REPEAT_INTERVAL == 0 {
+            log::warn!("DisplaySurface::flush failed ({} consecutive): {error:?}", self.consecutive_errors);
+        }
+    }
+
+    /// Records a successful `flush`, resetting the consecutive-error
+    /// count so a later failure is treated as a fresh "just started
+    /// failing" event (and logged immediately) rather than a
+    /// continuation of an old, already-resolved one.
+    fn on_ok(&mut self) {
+        self.consecutive_errors = 0;
+    }
+}
+
 #[cfg(feature = "frame-timing")]
 impl FrameTiming {
     const WINDOW: u32 = 30;
@@ -111,6 +160,14 @@ impl FrameTiming {
 /// callers retain ownership after `run` returns — e.g. a headless caller
 /// that wants to encode a PNG from its concrete `HeadlessSurface` once the
 /// loop stops.
+///
+/// `<P::Display as DisplaySurface>::Error: Debug` (bead
+/// ai-bitwarden-hw-key-mqk) is required so a persistently-failing
+/// `flush` can be logged (see [`FlushErrorTracker`]) — every concrete
+/// `DisplaySurface` in this codebase already satisfies this (firmware's
+/// `St7789SurfaceError` derives `Debug`; the emulator surfaces use
+/// `Infallible`, which is `Debug`), so this is not expected to be a
+/// breaking bound for any real caller.
 pub fn run<P: Platform, S: SyncSource>(
     platform: &mut P,
     app: &mut App,
@@ -119,9 +176,11 @@ pub fn run<P: Platform, S: SyncSource>(
     mut should_continue: impl FnMut() -> bool,
 ) where
     S::Error: std::fmt::Display,
+    <P::Display as DisplaySurface>::Error: core::fmt::Debug,
 {
     #[cfg(feature = "frame-timing")]
     let mut frame_timing = FrameTiming::new();
+    let mut flush_errors = FlushErrorTracker::default();
 
     while should_continue() {
         let frame_start = platform.clock().now();
@@ -143,9 +202,15 @@ pub fn run<P: Platform, S: SyncSource>(
             // not something this loop can meaningfully recover from frame
             // to frame; per the presentation-surface ADR, device-specific
             // errors are absorbed at the surface adapter, not propagated
-            // into the platform-free core. Dropping it here (rather than
-            // panicking) keeps the loop itself infallible.
-            let _ = platform.display().flush(framebuffer);
+            // into the platform-free core. Still not panicking here (the
+            // loop stays infallible) -- but no longer silently discarded
+            // either: `FlushErrorTracker` makes a persistent failure
+            // visible over serial (rate-limited) instead of looking like
+            // an inexplicable frozen screen (bead ai-bitwarden-hw-key-mqk).
+            match platform.display().flush(framebuffer) {
+                Ok(()) => flush_errors.on_ok(),
+                Err(error) => flush_errors.on_err(&error),
+            }
 
             #[cfg(feature = "frame-timing")]
             {
@@ -184,6 +249,25 @@ mod tests {
         fn flush(&mut self, _framebuffer: &FrameBuffer565) -> Result<(), Self::Error> {
             *self.flush_count.borrow_mut() += 1;
             Ok(())
+        }
+    }
+
+    /// Error type for [`FailingStubDisplay`]. `Debug`-only (no
+    /// `Display`/`std::error::Error` impl) -- deliberately the bare
+    /// minimum `run`'s new trait bound requires, so this test doesn't
+    /// accidentally prove more than the bound actually demands.
+    #[derive(Debug)]
+    struct StubFlushError;
+
+    /// A `DisplaySurface` whose `flush` always fails -- for proving
+    /// `run` tolerates a *persistently* failing display (bead
+    /// ai-bitwarden-hw-key-mqk) without panicking, as opposed to
+    /// `StubDisplay`'s always-succeeds `Infallible` case above.
+    struct FailingStubDisplay;
+    impl DisplaySurface for FailingStubDisplay {
+        type Error = StubFlushError;
+        fn flush(&mut self, _framebuffer: &FrameBuffer565) -> Result<(), Self::Error> {
+            Err(StubFlushError)
         }
     }
 
@@ -244,12 +328,79 @@ mod tests {
         }
     }
 
+    /// Mirrors `StubPlatform`, but with `FailingStubDisplay` in place of
+    /// `StubDisplay` -- used only by the flush-error-tolerance test
+    /// below, so `run`'s new `<P::Display as DisplaySurface>::Error:
+    /// Debug` bound is exercised against a real (non-`Infallible`) error
+    /// type, not just satisfied vacuously.
+    struct FailingStubPlatform {
+        display: FailingStubDisplay,
+        input: QueuedInput,
+        clock: StubClock,
+        storage: StubStorage,
+    }
+    impl Platform for FailingStubPlatform {
+        type Display = FailingStubDisplay;
+        type Input = QueuedInput;
+        type Clock = StubClock;
+        type Storage = StubStorage;
+
+        fn display(&mut self) -> &mut Self::Display {
+            &mut self.display
+        }
+        fn input(&mut self) -> &mut Self::Input {
+            &mut self.input
+        }
+        fn clock(&self) -> &Self::Clock {
+            &self.clock
+        }
+        fn storage(&mut self) -> &mut Self::Storage {
+            &mut self.storage
+        }
+    }
+
     struct EmptySyncSource;
     impl SyncSource for EmptySyncSource {
         type Error = Infallible;
         fn sync(&mut self) -> Result<Vec<VaultItem>, Self::Error> {
             Ok(Vec::new())
         }
+    }
+
+    #[test]
+    fn a_persistently_failing_flush_does_not_panic_and_the_loop_keeps_running() {
+        // Bead ai-bitwarden-hw-key-mqk's actual failure mode: a display
+        // that fails on EVERY frame, not just an occasional one (that's
+        // what a DMA misconfiguration making every SPI transaction
+        // invalid looks like). Every queued frame carries a `Next`
+        // intent so `app.dirty()` is true and `flush` (which always
+        // errors) is genuinely attempted on every single iteration, not
+        // skipped by the dirty-gate.
+        const ITERATIONS: usize = 10;
+        let mut platform = FailingStubPlatform {
+            display: FailingStubDisplay,
+            input: QueuedInput(vec![vec![NavIntent::Next]; ITERATIONS]),
+            clock: StubClock,
+            storage: StubStorage,
+        };
+        let items = vec![
+            VaultItem { id: Uuid::new_v4(), name: "a".into(), username: "a".into(), password: String::new(), uri: None, notes: None },
+            VaultItem { id: Uuid::new_v4(), name: "b".into(), username: "b".into(), password: String::new(), uri: None, notes: None },
+        ];
+        let mut app = App::new(320, 170, items);
+        let mut sync = EmptySyncSource;
+
+        let mut iterations = 0;
+        // The absence of a panic across every one of these iterations
+        // IS the assertion: `run` took the `Err` branch (not `Ok`)
+        // `ITERATIONS` times in a row and kept going regardless, per the
+        // presentation-surface ADR's "loop stays infallible" contract.
+        run(&mut platform, &mut app, &mut sync, Duration::from_millis(0), || {
+            iterations += 1;
+            iterations <= ITERATIONS
+        });
+
+        assert_eq!(iterations, ITERATIONS + 1, "should_continue is checked once more after the last real iteration");
     }
 
     #[test]
