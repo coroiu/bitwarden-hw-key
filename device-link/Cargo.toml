@@ -1,0 +1,45 @@
+[package]
+name = "device-link"
+version = "0.1.0"
+authors = ["Andreas Coroiu <andreas.coroiu@gmail.com>"]
+edition = "2021"
+rust-version = "1.77"
+
+# Portable USB-CDC framing crate for the host<->T-Embed link (M1.5 Phase 2,
+# ai-bitwarden-hw-key-2ox). Modeled on push-protocol's dependency-lightness:
+# this crate must build unmodified on BOTH the xtensa firmware target (this
+# root workspace) and web-companion's own nested stable-Rust workspace
+# (ai-bitwarden-hw-key-eml.1), so its dependency tree stays deliberately
+# small.
+#
+# Path deps:
+# - push-protocol: reuse SyncRequest/SyncResponse/Credential verbatim so the
+#   CBOR blob carried inside SyncChunk frames is byte-for-byte what the
+#   existing HTTP+CBOR push protocol already produces -- no re-derivation,
+#   no drift.
+# - bhk-core: reuse NavIntent (the frozen semantic input vocabulary) for
+#   InputInject payloads. bhk-core is platform-free (no esp-idf-*/minifb/
+#   tiny_http/ssd1306) but NOT dependency-light like push-protocol -- it
+#   pulls in embedded-graphics/embedded-graphics-framebuf/u8g2-fonts for its
+#   render-layer code. Confirmed (WS1 report, ai-bitwarden-hw-key-2ox.1)
+#   that this compiles cleanly under both the esp toolchain and a plain
+#   stable toolchain (1.91.1, matching web-companion's pin), so it is not a
+#   build-breaker -- but it is a heavier transitive footprint than
+#   push-protocol's, worth a second look before WS4 links this crate into
+#   web-companion.
+#
+# See: .planning/decisions (M1.5 Phase 2 device-link framing, per Ada's
+# design) and .planning/decisions/2026-08-11-sync-direction-companion-push.md.
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+ciborium = "0.2"
+crc = "3.4"
+push-protocol = { path = "../push-protocol" }
+bhk-core = { path = "../core" }
+
+[dev-dependencies]
+# Only for the lib.rs doctest, which builds a push_protocol::Credential
+# directly and needs to construct its `Uuid` field. Version pinned to match
+# push-protocol's own dependency so Cargo resolves a single copy.
+uuid = { version = "1.8.0", features = ["v4"] }
