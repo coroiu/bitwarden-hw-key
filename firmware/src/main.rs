@@ -45,13 +45,91 @@ const FRAME_BUDGET: Duration = Duration::from_millis(33);
 /// Placeholder `SyncSource` until a real companion-push transport
 /// (BLE/USB) exists for the board. Always reports an empty vault rather
 /// than fabricating data.
+///
+/// `#[cfg(not(feature = "demo-seed"))]`: the `demo-seed` build uses
+/// `DemoSeedSyncSource` instead (see its doc comment for why `NoSyncSource`
+/// specifically -- always-empty -- can't just have its initial items
+/// overridden), so this type would otherwise be unused dead code under
+/// that feature.
+#[cfg(not(feature = "demo-seed"))]
 struct NoSyncSource;
 
+#[cfg(not(feature = "demo-seed"))]
 impl SyncSource for NoSyncSource {
     type Error = Infallible;
 
     fn sync(&mut self) -> Result<Vec<VaultItem>, Self::Error> {
         Ok(Vec::new())
+    }
+}
+
+/// **TEMPORARY hardware-test aid** (bead ai-bitwarden-hw-key-ekd), gated
+/// behind the off-by-default `demo-seed` cargo feature. Seeds a handful
+/// of placeholder credentials purely so the credential list has
+/// something to scroll through, to verify the T-Embed CC1101
+/// encoder-pin fix (`NavIntent`s reaching the app and moving selection)
+/// on real hardware while there is still no sync transport to populate
+/// the vault for real.
+///
+/// This does **not** relax the "`NoSyncSource` is honest" principle in
+/// this module's doc comment above: `main`'s default build (this
+/// feature OFF) still starts from an empty vault. This function only
+/// exists, and is only called, when `demo-seed` is explicitly enabled.
+#[cfg(feature = "demo-seed")]
+fn demo_vault_items() -> Vec<VaultItem> {
+    fn item(name: &str, username: &str) -> VaultItem {
+        VaultItem {
+            id: uuid::Uuid::new_v4(),
+            name: name.to_string(),
+            username: username.to_string(),
+            password: "hunter2".to_string(),
+            uri: None,
+            notes: None,
+        }
+    }
+
+    vec![
+        item("GitHub", "octocat"),
+        item("AWS Console", "root"),
+        item("Gmail", "andreas@example.com"),
+        item("Bank of Example", "acoroiu"),
+        item("Home Wi-Fi", "router-admin"),
+    ]
+}
+
+/// The `SyncSource` half of the `demo-seed` hardware-test aid.
+///
+/// **Root-cause note (first attempt at this feature got this wrong):**
+/// passing seeded items only to `App::new`'s constructor is NOT enough
+/// to make them appear on screen. `bhk_core::run`'s loop calls
+/// `app.step(sync)` — which lands in `VaultStore::apply_sync_ok`,
+/// replacing the store's items whenever they differ from the sync
+/// result — on *every* frame, starting with frame 1, before the first
+/// render. `NoSyncSource::sync()` always returns `Ok(Vec::new())`, which
+/// differs from the 5 seeded items, so the very first loop iteration
+/// wiped them back to empty before anything ever rendered. Confirmed on
+/// real hardware: the boot-time seed warning fired but the list still
+/// showed empty.
+///
+/// The fix is to seed through the same path the emulator's
+/// `PushSyncSource` uses (see `emulator/src/desktop/push_sync_source.rs`):
+/// a `SyncSource` whose `sync()` returns the **same persisted items every
+/// call**, not a one-shot value handed only to `App::new`. Once
+/// `VaultStore` has applied a `Vec<VaultItem>` once, every later
+/// `sync()` call returning an equal `Vec` is a no-op in
+/// `apply_sync_ok`'s `items != self.items` check, so the seed survives
+/// indefinitely instead of being overwritten on the next frame.
+#[cfg(feature = "demo-seed")]
+struct DemoSeedSyncSource {
+    items: Vec<VaultItem>,
+}
+
+#[cfg(feature = "demo-seed")]
+impl SyncSource for DemoSeedSyncSource {
+    type Error = Infallible;
+
+    fn sync(&mut self) -> Result<Vec<VaultItem>, Self::Error> {
+        Ok(self.items.clone())
     }
 }
 
@@ -73,7 +151,6 @@ fn main() -> Result<(), EspError> {
         peripherals.lcd_mosi,
         peripherals.lcd_cs,
         peripherals.lcd_dc,
-        peripherals.lcd_reset,
         peripherals.lcd_backlight,
         peripherals.peripheral_power_on,
     )
@@ -84,9 +161,25 @@ fn main() -> Result<(), EspError> {
     let nvs_partition = EspDefaultNvsPartition::take()?;
     let storage = NvsStorage::new(nvs_partition)?;
 
+    // `initial_items` is pulled from `sync.sync()` up front (matching
+    // exactly how `emulator/src/main.rs` seeds `App::new` from its
+    // `PushSyncSource`), not handed to `App::new` independently of
+    // `sync` -- see `DemoSeedSyncSource`'s doc comment for why that
+    // distinction matters: `App::new`'s constructor argument alone does
+    // NOT survive the run loop's first `app.step(sync)` call.
+    #[cfg(feature = "demo-seed")]
+    let (mut sync, initial_items) = {
+        log::warn!("demo-seed feature ENABLED: vault seeded with placeholder credentials, not real synced data -- this build is a hardware-test aid only, never ship it as default");
+        let mut sync = DemoSeedSyncSource { items: demo_vault_items() };
+        let initial_items = sync.sync().expect("DemoSeedSyncSource::sync is Infallible");
+        log::info!("demo-seed: sync produced {} placeholder item(s)", initial_items.len());
+        (sync, initial_items)
+    };
+    #[cfg(not(feature = "demo-seed"))]
+    let (mut sync, initial_items): (NoSyncSource, Vec<VaultItem>) = (NoSyncSource, Vec::new());
+
     let mut platform = BoardPlatform::new(display, input, storage);
-    let mut app = App::new(u32::from(DISPLAY_WIDTH), u32::from(DISPLAY_HEIGHT), Vec::new());
-    let mut sync = NoSyncSource;
+    let mut app = App::new(u32::from(DISPLAY_WIDTH), u32::from(DISPLAY_HEIGHT), initial_items);
 
     log::info!("Entering main loop");
     run(&mut platform, &mut app, &mut sync, FRAME_BUDGET, || true);

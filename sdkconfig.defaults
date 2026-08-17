@@ -1,0 +1,51 @@
+# IMPORTANT: this file must live at the WORKSPACE ROOT, not inside
+# firmware/. esp-idf-sys's build script (build/native/cargo_driver.rs in
+# esp-idf-sys 0.36.1) resolves the default "sdkconfig.defaults" filename
+# via `.abspath_relative_to(&workspace_dir)`, i.e. relative to the Cargo
+# workspace root -- NOT the firmware crate directory -- and there is no
+# `[package.metadata.esp-idf-sys]` override in this workspace to change
+# that. This file used to live at firmware/sdkconfig.defaults (from
+# before the core/firmware/emulator workspace split) and was SILENTLY
+# NEVER READ as a result: confirmed while investigating bead
+# ai-bitwarden-hw-key-1k8's stack overflow, the generated sdkconfig
+# showed the raw ESP-IDF default (3584) even though this file already
+# said 8000. Moved here as part of that fix -- if this file appears to
+# have no effect again, check it's still at the workspace root, not a
+# crate subdirectory.
+#
+# Rust often needs a bit of an extra main task stack size compared to C (the default is 3K)
+# Bumped 8000 -> 32768 (bead ai-bitwarden-hw-key-1k8): opening the credential
+# detail view (Activate on the list) overflowed the 8000-byte stack on real
+# hardware ("A stack overflow in task main has been detected"). Investigated
+# core/src/credential_detail_view.rs and core/src/render/secret_field.rs for
+# an accidental large stack allocation (a framebuffer-sized local, a big
+# fixed array, a big struct by value) -- none found; FrameBuffer565 is
+# Vec-backed (heap), FontRenderer is a thin static-table wrapper (per its
+# own doc comment), and the only fixed-size stack arrays anywhere in the
+# render core are 4-byte UTF-8 scratch buffers shared with the list view
+# (which does NOT overflow). The real, structural difference: the detail
+# view's render_fields()/render_field() call u8g2_fonts's
+# get_rendered_dimensions_aligned (font metric measurement) TWICE per
+# field per render (line_height() for both the label and value font, via
+# field_height()) in addition to the actual draw call, and nest
+# DrawTargetExt::clipped() two levels deep (render_fields -> render_field
+# -> SecretField::render for the password field) -- versus the list
+# view's flat per-row draw using precomputed constants
+# (NAME_LINE_FOOTPRINT/USERNAME_LINE_FOOTPRINT in render/list.rs), with no
+# runtime font-metric queries at all. In an unoptimized debug build that's
+# genuinely deeper, more-repeated generic/monomorphized call-graph depth
+# per render, not a leak -- a legitimate stack-budget shortfall, not an
+# accidental allocation bug. 32768 is generous headroom (this board has
+# hundreds of KB of SRAM free per the boot heap_init log), not a tightly
+# tuned minimum -- deliberately so a future detail-view feature (more
+# fields, deeper nesting) doesn't reopen this exact bug at a slightly
+# higher threshold.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=32768
+
+# Use this to set FreeRTOS kernel tick frequency to 1000 Hz (100 Hz by default).
+# This allows to use 1 ms granuality for thread sleeps (10 ms by default).
+#CONFIG_FREERTOS_HZ=1000
+
+# Workaround for https://github.com/espressif/esp-idf/issues/7631
+#CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n
+#CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=n

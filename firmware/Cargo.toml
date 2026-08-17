@@ -26,13 +26,27 @@ embassy = [
   "esp-idf-svc/critical-section",
   "esp-idf-svc/embassy-time-driver",
 ]
+# TEMPORARY hardware-test aid (bead ai-bitwarden-hw-key-ekd), OFF by
+# default: seeds a handful of placeholder `VaultItem`s in `main.rs` so
+# the credential list is navigable on real hardware for verifying the
+# T-Embed CC1101 encoder-pin fix, even though there is no sync transport
+# yet. Must never be part of `default` -- the honest-empty-vault
+# behavior of `NoSyncSource` (see `main.rs`'s module doc) is a real
+# product property, not a placeholder to casually override.
+demo-seed = ["dep:uuid"]
 
 [dependencies]
 bhk-core = { path = "../core" }
 log = { version = "0.4", default-features = false }
 embedded-graphics = "0.8.1"
 esp-idf-svc = { version = "0.51", default-features = false }
-esp-idf-hal = "0.45"
+# "alloc" (off by default for esp-idf-hal 0.45) is required for
+# `PinDriver::subscribe`, which `board::rotary_input` uses to install
+# GPIO edge-interrupt ISR callbacks for the encoder's quadrature decode
+# (bead ai-bitwarden-hw-key-47d) -- `subscribe` is `#[cfg(feature =
+# "alloc")]` in esp-idf-hal's own source since it boxes the callback
+# closure.
+esp-idf-hal = { version = "0.45", features = ["alloc"] }
 # `embedded_svc::storage::RawStorage` (get_raw/set_raw/len) is what
 # `board::nvs_storage::NvsStorage` uses against `EspNvs`. Pinned to the
 # same 0.28 esp-idf-svc 0.51 already depends on, so Cargo resolves both
@@ -41,7 +55,6 @@ embedded-svc = { version = "0.28", default-features = false }
 # T-Embed (ESP32-S3) board adapter, W6: real ST7789 panel driver and
 # rotary-encoder quadrature decoder. See `board/` for the trait impls.
 mipidsi = "0.10"
-rotary-encoder-hal = "0.6"
 # `board::rotary_input` reuses this for the encoder's push-button
 # (debounce/click/long-press) instead of hand-rolling it again. The
 # original `esp_input.rs` enabled only "esp"/"std" and worked around the
@@ -53,6 +66,13 @@ rotary-encoder-hal = "0.6"
 # `esp_idf_hal::gpio::PinDriver` directly as a `PinWrapper` with no
 # wrapper type.
 button-driver = { version = "0.2", features = ["esp", "std", "embedded_hal"] }
+# Only pulled in by the off-by-default `demo-seed` feature (see
+# `[features]` above), to build placeholder `VaultItem` ids. Same
+# version/feature spec as `core/Cargo.toml`'s own `uuid` dependency
+# (already proven to build for this xtensa-esp32s3-espidf target via
+# `bhk-core`'s transitive dependency), so this doesn't introduce a new
+# unverified dependency, just makes it directly callable from `main.rs`.
+uuid = { version = "1.8.0", features = ["v4"], optional = true }
 
 [build-dependencies]
 embuild = { version = "0.33", features = ["espidf"] }
