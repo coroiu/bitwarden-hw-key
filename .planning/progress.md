@@ -1,19 +1,23 @@
 # Project Progress
 
-**Last Updated**: 2026-08-12 (M0 emulator milestone complete; all 9 workstreams merged)
+**Last Updated**: 2026-08-17 (M1.5 Web Companion Phase 1 complete; end-to-end real vault sync verified on emulator)
 
-## Current Status (2026-08-12)
+## Current Status (2026-08-17)
 
 **M0 (Platform Migration) EMULATOR MILESTONE: COMPLETE**
-All nine workstreams (W1–W9) merged to main. Fully operational 320x170 color shell, keyboard-drivable in windowed mode, fully agent-drivable in headless mode via HTTP NavIntent injection. Remaining M0 work: on-hardware validation on the physical T-Embed (bead `ai-bitwarden-hw-key-dvm`, pending board arrival).
+All nine workstreams (W1–W9) merged to main. Fully operational 320x170 color shell, keyboard-drivable in windowed mode, fully agent-drivable in headless mode via HTTP NavIntent injection. Remaining M0 work: on-hardware validation on the physical T-Embed (bead `ai-bitwarden-hw-key-dvm`, now unblocked by hardware arrival).
 
 **M1 (Vault Browse) DEVICE DISPLAY: COMPLETE**
-Credential list and detail views designed and implemented on color + rotary encoder. Full render/nav/input stacks merged to main and verified headless. Real vault sync delivery deferred to M1.5 (Web Companion).
+Credential list and detail views designed and implemented on color + rotary encoder. Full render/nav/input stacks merged to main and verified headless. Real vault sync delivery complete via M1.5 (Web Companion).
 
-**M1.5 (Web Companion) ARCHITECTURE DECIDED, PHASE 0 COMPLETE**
-The companion evolved from bw-CLI bridge proof-of-concept (proven to work, bead ai-bitwarden-hw-key-eml.1) to a full interactive web companion after Andreas clarified the UX requirement. New architecture: local Rust server (axum + tokio) running the Bitwarden Rust SDK natively, serving thin vanilla-JS web UI over 127.0.0.1. Server owns device transport (pluggable DeviceTransport trait). Phase 0 (SDK spike): proven SDK links on host in isolated nested workspace (bead ai-bitwarden-hw-key-eml.1). Phase 1 (current): axum skeleton + auth boundary merged (eml.2); auth in progress (eml.3); vault-read (eml.4), transport (eml.5), UI (eml.6), testing (eml.7) queued. Accepted PoC security posture: bind 127.0.0.1, bearer token, passwords never to browser, decrypted secret server->device only, zeroize on lock.
+**M1.5 (Web Companion) PHASE 1 COMPLETE: END-TO-END REAL VAULT SYNC VERIFIED**
+Architecture: local Rust server (axum + tokio) linking the Bitwarden SDK, thin vanilla-JS web UI served over 127.0.0.1, server-owned DeviceTransport (Phase 1: HttpEmulatorTransport via CBOR /api/sync; Phase 2: native BLE/USB to T-Embed). Real flow verified end-to-end: live Bitwarden login with 2FA, vault sync of 24 items, push to emulated device, device renders credential list and detail view with masked passwords. Beads: epic ai-bitwarden-hw-key-eml with children eml.1 through eml.11 delivered. eml.1 (SDK feasibility on host, proven); eml.2 (axum server skeleton + bearer-token boundary); eml.3 (auth: login form, SDK login_password, 2FA support); eml.4 (vault read: SDK sync, metadata-only list); eml.5 (device transport: HttpEmulatorTransport); eml.6 (web UI: vanilla JS, login, vault list, sync button); eml.7 (integration tests); eml.8 (docs); eml.10 (startup banner); eml.11 (login fix). eml.9 and eml.12 closed as superseded/duplicate. Epic eml remains OPEN for Phase 2.
 
-**Next: M1.5 Phase 1 implementation and M2 (Type it)**
+**Key Fix in eml.11:** Real login returned 401 until ClientSettings.bitwarden_client_version was set to Some(CARGO_PKG_VERSION). The live Bitwarden API rejects requests lacking the client-version header. This class of bug surfaces only against the live API, not compile-only checks or dev mocks. Fix committed; real vault sync now fully functional.
+
+**Security Posture in Place (PoC):** Bind 127.0.0.1 only; per-process bearer token; passwords never sent to browser; metadata-only vault list; decrypted vault server-side only, pushed to device during sync, zeroized on lock/logout. A gitignored debug test account exists at data/dev-account.env for end-to-end testing (do not commit; never print the password in docs).
+
+**Next: Phase 2 (native BLE/USB transport to physical T-Embed, firmware sync handler) overlaps M2 (Type it). Hardware has now arrived, so M0 on-hardware validation and Phase 2 are unblocked.**
 
 ## Completed (Prototype Era: 128x32 Mono OLED + 3-Button Navigation)
 Historical work from the initial Adafruit HUZZAH32 prototype. Treated as throwaway pending M0 green-field redesign. Salvageable components: credential data model, sync/storage layer concept.
