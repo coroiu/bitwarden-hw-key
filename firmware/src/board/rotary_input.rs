@@ -113,8 +113,14 @@ impl AccelerationWindow {
 /// **not** wired up here — out of scope for this pass, tracked in bead
 /// ai-bitwarden-hw-key-ekd alongside the rest of the multi-variant board
 /// selection.
+/// Type order matches the `(b, a)` argument order `Rotary::new` is
+/// actually called with below (see that call site's comment for why) —
+/// `rotary-encoder-hal`'s `Rotary<A, B, _>` decodes direction from
+/// whichever pin is passed first as leading/second as lagging, so the
+/// generic order here must track the constructor call's argument order,
+/// not `ENCODER_PIN_A`/`ENCODER_PIN_B`'s naming.
 pub struct RotaryEncoderInput {
-    rotary: Rotary<PinDriver<'static, Gpio4, Input>, PinDriver<'static, Gpio5, Input>, DefaultPhase>,
+    rotary: Rotary<PinDriver<'static, Gpio5, Input>, PinDriver<'static, Gpio4, Input>, DefaultPhase>,
     button: Button<PinDriver<'static, Gpio0, Input>, Instant>,
     fast_window: Option<AccelerationWindow>,
 }
@@ -143,7 +149,24 @@ impl RotaryEncoderInput {
         btn.set_pull(Pull::Up)?;
 
         Ok(Self {
-            rotary: Rotary::new(a, b),
+            // Hardware-confirmed direction correction (bead
+            // ai-bitwarden-hw-key-bgl): passed as `Rotary::new(b, a)`,
+            // NOT `(a, b)`. On real T-Embed CC1101 hardware, wiring
+            // `ENCODER_PIN_A`/`ENCODER_PIN_B` (GPIO4/GPIO5, per their own
+            // vendor-sourced doc comments in `board_config.rs`) to
+            // `Rotary::new` in that A-then-B order produced CCW ->
+            // `NavIntent::Next` (backwards from the spec: CW should be
+            // `Next`/"move down"). `rotary-encoder-hal` derives CW/CCW
+            // purely from which of its two input pins it's told leads the
+            // other, so swapping the two arguments here flips the
+            // decoded direction to match physical rotation without
+            // touching `ENCODER_PIN_A`/`ENCODER_PIN_B` themselves (those
+            // still correctly name GPIO4/GPIO5 per the CC1101's actual
+            // wiring) or `AccelerationWindow::classify`'s
+            // `Direction`->`NavIntent` mapping (still the natural
+            // CW=Next/CCW=Prev the ADR specifies) -- the swap belongs at
+            // the decode boundary, not layered on top of it.
+            rotary: Rotary::new(b, a),
             button: Button::new(
                 btn,
                 ButtonConfig {
